@@ -1,0 +1,23 @@
+validation:
+  mappings:
+    - class-name: com.example.validatingforminput.PersonForm
+      fields:
+        - field-name: name
+          constraints:
+            not-null:
+              value: true
+            not-blank:
+              value: true
+            size:
+              min:
+                value: 20
+              max:
+                value: 30
+        - field-name: age
+          constraints:
+            not-null:
+              value: true
+            min:
+              value: 18
+            max:
+              value: 60
