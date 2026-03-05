@@ -4,21 +4,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
 
-import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
-
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
-
-import com.example.validatingforminput.validation.RefreshableValidator;
-import com.example.validatingforminput.validation.ValidationProperties;
 
 import jakarta.validation.ConstraintViolationException;
 
@@ -38,17 +30,10 @@ import jakarta.validation.ConstraintViolationException;
 	"validation.mappings[0].fields[1].constraints.max.value=70"
 })
 @AutoConfigureMockMvc
-@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_EACH_TEST_METHOD)
 public class ApplicationMockMvcTests {
 
 	@Autowired
 	private MockMvc mockMvc;
-
-	@Autowired
-	private ValidationProperties validationProperties;
-
-	@Autowired
-	private RefreshableValidator refreshableValidator;
 
 	@Autowired
 	private PersonValidationService personValidationService;
@@ -72,45 +57,12 @@ public class ApplicationMockMvcTests {
 	}
 
 	@Test
-	public void shouldUseRefreshableValidatorForMethodValidation() {
+	public void shouldUseConfiguredStartupValidatorForMethodValidation() {
 		PersonForm form = new PersonForm();
 		form.setName("Robs");
 		form.setAge(20);
 
 		assertThatThrownBy(() -> personValidationService.validate(form))
 			.isInstanceOf(ConstraintViolationException.class);
-	}
-
-	@Test
-	public void shouldRebuildValidatorAndKeepHardMinFloorOnRefresh() throws Exception {
-		ValidationProperties.Constraints ageConstraints = fieldByName("age").getConstraints();
-		ageConstraints.getMin().setValue(20L);
-		refreshableValidator.refresh();
-
-		mockMvc.perform(post("/").param("name", "Robs").param("age", "21"))
-			.andExpect(model().attributeHasFieldErrors("personForm", "age"));
-
-		mockMvc.perform(post("/").param("name", "Robs").param("age", "22"))
-			.andExpect(model().hasNoErrors());
-	}
-
-	@Test
-	public void shouldKeepPreviousValidatorWhenRefreshConfigIsInvalid() throws Exception {
-		ValidationProperties.Constraints ageConstraints = fieldByName("age").getConstraints();
-		ageConstraints.getMin().setValue(70L);
-		ageConstraints.getMax().setValue(50L);
-		refreshableValidator.refresh();
-
-		mockMvc.perform(post("/").param("name", "Robs").param("age", "25"))
-			.andExpect(model().hasNoErrors());
-
-		mockMvc.perform(post("/").param("name", "Robs").param("age", "20"))
-			.andExpect(model().attributeHasFieldErrors("personForm", "age"));
-	}
-
-	private ValidationProperties.FieldMapping fieldByName(String fieldName) {
-		Map<String, ValidationProperties.FieldMapping> fieldsByName = validationProperties.getMappings().get(0).getFields().stream()
-			.collect(Collectors.toMap(ValidationProperties.FieldMapping::getFieldName, Function.identity()));
-		return fieldsByName.get(fieldName);
 	}
 }

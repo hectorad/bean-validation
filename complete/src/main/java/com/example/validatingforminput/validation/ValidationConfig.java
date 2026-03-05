@@ -2,13 +2,11 @@ package com.example.validatingforminput.validation;
 
 import org.hibernate.validator.HibernateValidatorConfiguration;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.validation.Validator;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
-import org.springframework.validation.beanvalidation.MethodValidationPostProcessor;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -21,7 +19,9 @@ public class ValidationConfig {
 		this.contributor = contributor;
 	}
 
-	public LocalValidatorFactoryBean buildValidator() {
+	@Bean
+	@Primary
+	public LocalValidatorFactoryBean validator() {
 		LocalValidatorFactoryBean validatorFactoryBean = new LocalValidatorFactoryBean();
 		validatorFactoryBean.setConfigurationInitializer(configuration -> {
 			if (configuration instanceof HibernateValidatorConfiguration hibernateConfiguration) {
@@ -41,26 +41,11 @@ public class ValidationConfig {
 	}
 
 	@Bean
-	@Primary
-	public RefreshableValidator refreshableValidator() {
-		return new RefreshableValidator(this::buildValidator);
-	}
-
-	@Bean
-	public static MethodValidationPostProcessor methodValidationPostProcessor(
-		ObjectProvider<jakarta.validation.Validator> validatorProvider
-	) {
-		MethodValidationPostProcessor postProcessor = new MethodValidationPostProcessor();
-		postProcessor.setValidatorProvider(validatorProvider);
-		return postProcessor;
-	}
-
-	@Bean
-	public WebMvcConfigurer webMvcValidationConfigurer(RefreshableValidator refreshableValidator) {
+	public WebMvcConfigurer webMvcValidationConfigurer(LocalValidatorFactoryBean validator) {
 		return new WebMvcConfigurer() {
 			@Override
 			public Validator getValidator() {
-				return refreshableValidator;
+				return validator;
 			}
 		};
 	}

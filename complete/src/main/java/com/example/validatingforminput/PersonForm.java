@@ -1,18 +1,19 @@
 package com.example.validatingforminput;
 
 
+import jakarta.validation.constraints.*;
 
 public class PersonForm {
 
-//	@NotNull
-//	@NotBlank
-//	@Size(min=3, max=30)
-//	@Pattern(regexp = "^[A-Za-z ]+$")
+	@NotNull
+	@NotBlank
+	@Size(min=3, max=30)
+	@Pattern(regexp = "^[A-Za-z ]+$")
 	private String name;
 
-//	@NotNull
-//	@Min(18)
-//	@Max(60)
+	@NotNull
+	@Min(18)
+	@Max(60)
 	private Integer age;
 
 	public String getName() {
