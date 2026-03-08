@@ -1,211 +1,257 @@
 package com.example.validatingforminput.validation;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.validation.annotation.Validated;
+
 import java.util.ArrayList;
 import java.util.List;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-
+@Validated
 @ConfigurationProperties(prefix = "validation")
 public class ValidationProperties {
 
-	private List<ClassMapping> mappings = new ArrayList<>();
+    @Valid
+    private List<@NotNull @Valid ClassMapping> mappings = new ArrayList<>();
 
-	public List<ClassMapping> getMappings() {
-		return mappings;
-	}
+    public List<ClassMapping> getMappings() {
+        return mappings;
+    }
 
-	public void setMappings(List<ClassMapping> mappings) {
-		this.mappings = (mappings == null) ? new ArrayList<>() : mappings;
-	}
+    public void setMappings(List<ClassMapping> mappings) {
+        this.mappings = (mappings == null) ? new ArrayList<>() : mappings;
+    }
 
-	public static class ClassMapping {
+    public static class ClassMapping {
 
-		private String className;
+        @NotBlank
+        private String className;
 
-		private List<FieldMapping> fields = new ArrayList<>();
+        @NotEmpty
+        @Valid
+        private List<@NotNull @Valid FieldMapping> fields = new ArrayList<>();
 
-		public String getClassName() {
-			return className;
-		}
+        public String getClassName() {
+            return className;
+        }
 
-		public void setClassName(String className) {
-			this.className = className;
-		}
+        public void setClassName(String className) {
+            this.className = trimToNull(className);
+        }
 
-		public List<FieldMapping> getFields() {
-			return fields;
-		}
+        public List<FieldMapping> getFields() {
+            return fields;
+        }
 
-		public void setFields(List<FieldMapping> fields) {
-			this.fields = (fields == null) ? new ArrayList<>() : fields;
-		}
-	}
+        public void setFields(List<FieldMapping> fields) {
+            this.fields = (fields == null) ? new ArrayList<>() : fields;
+        }
+    }
 
-	public static class FieldMapping {
+    public static class FieldMapping {
 
-		private String fieldName;
+        @NotBlank
+        private String fieldName;
 
-		private Constraints constraints = new Constraints();
+        @Valid
+        private Constraints constraints = new Constraints();
 
-		public String getFieldName() {
-			return fieldName;
-		}
+        public String getFieldName() {
+            return fieldName;
+        }
 
-		public void setFieldName(String fieldName) {
-			this.fieldName = fieldName;
-		}
+        public void setFieldName(String fieldName) {
+            this.fieldName = trimToNull(fieldName);
+        }
 
-		public Constraints getConstraints() {
-			return constraints;
-		}
+        public Constraints getConstraints() {
+            return constraints;
+        }
 
-		public void setConstraints(Constraints constraints) {
-			this.constraints = (constraints == null) ? new Constraints() : constraints;
-		}
-	}
+        public void setConstraints(Constraints constraints) {
+            this.constraints = (constraints == null) ? new Constraints() : constraints;
+        }
+    }
 
-	public static class Constraints {
+    public static class Constraints {
 
-		private ToggleConstraint notNull = new ToggleConstraint();
+        @Valid
+        private ToggleConstraint notNull = new ToggleConstraint();
 
-		private ToggleConstraint notBlank = new ToggleConstraint();
+        @Valid
+        private ToggleConstraint notBlank = new ToggleConstraint();
 
-		private NumericConstraint min = new NumericConstraint();
+        @Valid
+        private NumericConstraint min = new NumericConstraint();
 
-		private NumericConstraint max = new NumericConstraint();
+        @Valid
+        private NumericConstraint max = new NumericConstraint();
 
-		private SizeConstraint size = new SizeConstraint();
+        @Valid
+        private SizeConstraint size = new SizeConstraint();
 
-		private PatternConstraint pattern = new PatternConstraint();
+        @Valid
+        private PatternConstraint pattern = new PatternConstraint();
 
-		public ToggleConstraint getNotNull() {
-			return notNull;
-		}
+        public ToggleConstraint getNotNull() {
+            return notNull;
+        }
 
-		public void setNotNull(ToggleConstraint notNull) {
-			this.notNull = (notNull == null) ? new ToggleConstraint() : notNull;
-		}
+        public void setNotNull(ToggleConstraint notNull) {
+            this.notNull = (notNull == null) ? new ToggleConstraint() : notNull;
+        }
 
-		public ToggleConstraint getNotBlank() {
-			return notBlank;
-		}
+        public ToggleConstraint getNotBlank() {
+            return notBlank;
+        }
 
-		public void setNotBlank(ToggleConstraint notBlank) {
-			this.notBlank = (notBlank == null) ? new ToggleConstraint() : notBlank;
-		}
+        public void setNotBlank(ToggleConstraint notBlank) {
+            this.notBlank = (notBlank == null) ? new ToggleConstraint() : notBlank;
+        }
 
-		public NumericConstraint getMin() {
-			return min;
-		}
+        public NumericConstraint getMin() {
+            return min;
+        }
 
-		public void setMin(NumericConstraint min) {
-			this.min = (min == null) ? new NumericConstraint() : min;
-		}
+        public void setMin(NumericConstraint min) {
+            this.min = (min == null) ? new NumericConstraint() : min;
+        }
 
-		public NumericConstraint getMax() {
-			return max;
-		}
+        public NumericConstraint getMax() {
+            return max;
+        }
 
-		public void setMax(NumericConstraint max) {
-			this.max = (max == null) ? new NumericConstraint() : max;
-		}
+        public void setMax(NumericConstraint max) {
+            this.max = (max == null) ? new NumericConstraint() : max;
+        }
 
-		public SizeConstraint getSize() {
-			return size;
-		}
+        public SizeConstraint getSize() {
+            return size;
+        }
 
-		public void setSize(SizeConstraint size) {
-			this.size = (size == null) ? new SizeConstraint() : size;
-		}
+        public void setSize(SizeConstraint size) {
+            this.size = (size == null) ? new SizeConstraint() : size;
+        }
 
-		public PatternConstraint getPattern() {
-			return pattern;
-		}
+        public PatternConstraint getPattern() {
+            return pattern;
+        }
 
-		public void setPattern(PatternConstraint pattern) {
-			this.pattern = (pattern == null) ? new PatternConstraint() : pattern;
-		}
-	}
+        public void setPattern(PatternConstraint pattern) {
+            this.pattern = (pattern == null) ? new PatternConstraint() : pattern;
+        }
 
-	public static class ToggleConstraint {
+        boolean hasConfiguredValues() {
+            return isEnabled(notNull)
+                    || isEnabled(notBlank)
+                    || hasNumericValue(min)
+                    || hasNumericValue(max)
+                    || hasNumericValue(size.getMin())
+                    || hasNumericValue(size.getMax())
+                    || !pattern.getRegexes().isEmpty();
+        }
 
-		private Boolean value;
+        private boolean isEnabled(ToggleConstraint constraint) {
+            return Boolean.TRUE.equals(constraint.getValue()) || Boolean.TRUE.equals(constraint.getHardValue());
+        }
 
-		private Boolean hardValue;
+        private boolean hasNumericValue(NumericConstraint constraint) {
+            return constraint.getValue() != null || constraint.getHardValue() != null;
+        }
+    }
 
-		public Boolean getValue() {
-			return value;
-		}
+    public static class ToggleConstraint {
 
-		public void setValue(Boolean value) {
-			this.value = value;
-		}
+        private Boolean value;
 
-		public Boolean getHardValue() {
-			return hardValue;
-		}
+        private Boolean hardValue;
 
-		public void setHardValue(Boolean hardValue) {
-			this.hardValue = hardValue;
-		}
-	}
+        public Boolean getValue() {
+            return value;
+        }
 
-	public static class NumericConstraint {
+        public void setValue(Boolean value) {
+            this.value = value;
+        }
 
-		private Long value;
+        public Boolean getHardValue() {
+            return hardValue;
+        }
 
-		private Long hardValue;
+        public void setHardValue(Boolean hardValue) {
+            this.hardValue = hardValue;
+        }
+    }
 
-		public Long getValue() {
-			return value;
-		}
+    public static class NumericConstraint {
 
-		public void setValue(Long value) {
-			this.value = value;
-		}
+        private Long value;
 
-		public Long getHardValue() {
-			return hardValue;
-		}
+        private Long hardValue;
 
-		public void setHardValue(Long hardValue) {
-			this.hardValue = hardValue;
-		}
-	}
+        public Long getValue() {
+            return value;
+        }
 
-	public static class SizeConstraint {
+        public void setValue(Long value) {
+            this.value = value;
+        }
 
-		private NumericConstraint min = new NumericConstraint();
+        public Long getHardValue() {
+            return hardValue;
+        }
 
-		private NumericConstraint max = new NumericConstraint();
+        public void setHardValue(Long hardValue) {
+            this.hardValue = hardValue;
+        }
+    }
 
-		public NumericConstraint getMin() {
-			return min;
-		}
+    public static class SizeConstraint {
 
-		public void setMin(NumericConstraint min) {
-			this.min = (min == null) ? new NumericConstraint() : min;
-		}
+        @Valid
+        private NumericConstraint min = new NumericConstraint();
 
-		public NumericConstraint getMax() {
-			return max;
-		}
+        @Valid
+        private NumericConstraint max = new NumericConstraint();
 
-		public void setMax(NumericConstraint max) {
-			this.max = (max == null) ? new NumericConstraint() : max;
-		}
-	}
+        public NumericConstraint getMin() {
+            return min;
+        }
 
-	public static class PatternConstraint {
+        public void setMin(NumericConstraint min) {
+            this.min = (min == null) ? new NumericConstraint() : min;
+        }
 
-		private List<String> regexes = new ArrayList<>();
+        public NumericConstraint getMax() {
+            return max;
+        }
 
-		public List<String> getRegexes() {
-			return regexes;
-		}
+        public void setMax(NumericConstraint max) {
+            this.max = (max == null) ? new NumericConstraint() : max;
+        }
+    }
 
-		public void setRegexes(List<String> regexes) {
-			this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
-		}
-	}
+    public static class PatternConstraint {
+
+        private List<@NotBlank String> regexes = new ArrayList<>();
+
+        public List<String> getRegexes() {
+            return regexes;
+        }
+
+        public void setRegexes(List<String> regexes) {
+            this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
+        }
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
 }

@@ -82,4 +82,48 @@ class ConstraintMergeServiceTests {
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
 			.hasMessageContaining("effectiveMin > effectiveMax");
 	}
+
+	@Test
+	void shouldFailWhenConfiguredPatternIsEmpty() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of(""));
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("regex must be non-empty");
+	}
+
+	@Test
+	void shouldFailWhenConfiguredPatternIsInvalid() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of("["));
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("regex could not be compiled");
+	}
+
+	@Test
+	void shouldFailWhenConfiguredSizeIsNegative() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getSize().getMin().setValue(-1L);
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("must be >= 0");
+	}
+
+	@Test
+	void shouldFailWhenConfiguredSizeExceedsIntegerRange() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getSize().getMax().setHardValue(((long) Integer.MAX_VALUE) + 1L);
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("exceeds Integer.MAX_VALUE");
+	}
 }

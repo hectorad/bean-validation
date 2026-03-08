@@ -1,0 +1,666 @@
+# Validation Constraint Mapping Flow
+
+This document explains how the config-driven validation pipeline works in this project, with emphasis on:
+
+- `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)`
+- `ConfigDrivenConstraintMappingContributor.applyConstraints(...)`
+- `ConstraintMergeService.merge(...)`
+
+The goal of the pipeline is to take:
+
+1. validation annotations already present on the Java model
+2. extra constraints configured in `validation.*` properties
+
+and turn them into one final set of Hibernate Validator rules that the application uses at runtime.
+
+## High-level flow
+
+The flow is:
+
+1. `GeneratedClassMetadataCache` resolves configured classes and fields.
+2. It extracts baseline constraints from field and getter annotations.
+3. `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)` iterates over every resolved class and field.
+4. For each field, `ConstraintMergeService.merge(...)` combines baseline constraints and configured constraints into one `EffectiveFieldConstraints` object.
+5. `applyConstraints(...)` translates that `EffectiveFieldConstraints` object into Hibernate Validator programmatic mappings.
+
+That means the policy decisions happen before `applyConstraints(...)`.
+
+`applyConstraints(...)` is mostly an adapter from the merged internal model to Hibernate Validator's DSL.
+
+## Key types
+
+### `BaselineFieldConstraints`
+
+Represents what was already declared in code with annotations like:
+
+- `@NotNull`
+- `@NotBlank`
+- `@Min`
+- `@Max`
+- `@Size`
+- `@Pattern`
+
+These values come from `GeneratedClassMetadataCache`.
+
+### `ValidationProperties.Constraints`
+
+Represents what came from `application.yml` or other Spring config sources.
+
+Examples:
+
+```yaml
+validation:
+  mappings:
+    - class-name: com.example.validatingforminput.PersonForm
+      fields:
+        - field-name: name
+          constraints:
+            not-blank:
+              value: true
+            size:
+              min:
+                value: 4
+              max:
+                value: 40
+            pattern:
+              regexes:
+                - ^[A-Za-z]+$
+```
+
+### `EffectiveFieldConstraints`
+
+This is the final merged view used by the contributor.
+
+It contains:
+
+- `notNull`
+- `notBlank`
+- `min`
+- `max`
+- `sizeMin`
+- `sizeMax`
+- `patterns`
+
+If `EffectiveFieldConstraints` says `min = 25`, then the contributor will add a programmatic `@Min(25)`.
+
+## `createConstraintMappings(...)`
+
+Source: `ConfigDrivenConstraintMappingContributor`
+
+This method builds the runtime validation mapping for every configured class and field.
+
+### Step 1: index configured classes
+
+```java
+Map<String, ValidationProperties.ClassMapping> configuredClasses = indexByClass(validationProperties);
+```
+
+This makes config lookups fast by converting the list of class mappings into a map keyed by class name.
+
+If the config contains:
+
+- `PersonForm`
+- `AddressForm`
+
+then this map lets the contributor find a class mapping directly by name.
+
+### Step 2: loop over resolved classes
+
+```java
+for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
+```
+
+`resolvedClassMappings` comes from `GeneratedClassMetadataCache`.
+
+Each `ResolvedClassMapping` contains:
+
+- the class name
+- the actual `Class<?>`
+- the resolved fields for that class
+
+This list has already been validated for things like:
+
+- class exists
+- field exists
+- duplicates
+
+### Step 3: create one Hibernate Validator mapping per class
+
+```java
+ConstraintMapping constraintMapping = builder.addConstraintMapping();
+TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
+```
+
+This tells Hibernate Validator:
+
+"I am about to define constraints for this Java type."
+
+`typeContext` is the class-level builder that later gives field-level builders.
+
+### Step 4: index configured fields for the current class
+
+```java
+Map<String, ValidationProperties.FieldMapping> configuredFields =
+	indexByField(configuredClasses.get(resolvedClassMapping.className()));
+```
+
+This narrows the config to only the current class and builds a map by field name.
+
+If there is no config entry for the class, `indexByField(...)` returns an empty map.
+
+That is important because a field can still have baseline constraints even without extra config.
+
+### Step 5: loop over resolved fields
+
+```java
+for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
+```
+
+Each `ResolvedFieldMapping` contains:
+
+- the field name
+- the baseline constraints extracted from annotations
+
+### Step 6: find the configured constraints for the current field
+
+```java
+ValidationProperties.FieldMapping configuredField = configuredFields.get(resolvedFieldMapping.fieldName());
+ValidationProperties.Constraints configuredConstraints =
+	(configuredField == null) ? null : configuredField.getConstraints();
+```
+
+Possible outcomes:
+
+- field has config, so `configuredConstraints` is non-null
+- field has no config, so `configuredConstraints` is null
+
+### Step 7: merge baseline and config
+
+```java
+EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
+	resolvedFieldMapping.baselineConstraints(),
+	configuredConstraints,
+	resolvedClassMapping.className(),
+	resolvedFieldMapping.fieldName());
+```
+
+This is where the actual constraint policy lives.
+
+The contributor does not decide:
+
+- whether config should strengthen baseline
+- whether multiple regexes should accumulate
+- whether `min > max` is invalid
+
+That all happens in `merge(...)`.
+
+### Step 8: install the merged constraints
+
+```java
+applyConstraints(typeContext, resolvedFieldMapping.fieldName(), effectiveConstraints);
+```
+
+After merge, the contributor turns the internal model into real Hibernate Validator constraints.
+
+## `applyConstraints(...)`
+
+Source: `ConfigDrivenConstraintMappingContributor`
+
+This method takes one merged field snapshot and writes it into Hibernate Validator's programmatic mapping API.
+
+### Method purpose
+
+It does not decide what the final constraints should be.
+
+It assumes that `effectiveConstraints` is already valid and final.
+
+Its job is:
+
+- select the target field
+- ignore direct annotation processing for that field
+- add programmatic constraints that match the merged result
+
+### Step 1: get the field mapping context
+
+```java
+PropertyConstraintMappingContext propertyContext =
+	typeContext.field(fieldName).ignoreAnnotations(true);
+```
+
+This line does two things:
+
+1. `typeContext.field(fieldName)` selects the field on the current class.
+2. `ignoreAnnotations(true)` tells Hibernate Validator not to apply the field's annotation-based constraints directly.
+
+This is critical.
+
+Without `ignoreAnnotations(true)`, the runtime validator could see both:
+
+- the original annotations from the Java field
+- the merged programmatic constraints added by the contributor
+
+That would duplicate constraints and break the whole "merge into one final view" design.
+
+So the contributor intentionally disables direct annotation processing and then re-applies the effective result itself.
+
+### Step 2: apply `@NotNull`
+
+```java
+if (effectiveConstraints.notNull()) {
+	propertyContext.constraint(new NotNullDef());
+}
+```
+
+If the merged result says the field must not be null, the contributor adds a programmatic `@NotNull`.
+
+If the merged result says `false`, nothing is added.
+
+There is no inverse rule like "allow null". The absence of `@NotNull` is what allows null.
+
+### Step 3: apply `@NotBlank`
+
+```java
+if (effectiveConstraints.notBlank()) {
+	propertyContext.constraint(new NotBlankDef());
+}
+```
+
+If the field must be non-blank, the contributor adds a programmatic `@NotBlank`.
+
+This usually applies to string-like fields.
+
+`@NotBlank` is stronger than `@NotNull` because it rejects:
+
+- `null`
+- `""`
+- `"   "`
+
+If both `notNull` and `notBlank` are true, both constraints are added.
+
+That is logically redundant but harmless.
+
+### Step 4: apply `@Min`
+
+```java
+if (effectiveConstraints.min() != null) {
+	propertyContext.constraint(new MinDef().value(effectiveConstraints.min()));
+}
+```
+
+If the merged result has a numeric lower bound, the contributor adds `@Min(value)`.
+
+Example:
+
+- `min = 25`
+- valid values: `25`, `26`, `30`
+- invalid values: `24`, `0`
+
+### Step 5: apply `@Max`
+
+```java
+if (effectiveConstraints.max() != null) {
+	propertyContext.constraint(new MaxDef().value(effectiveConstraints.max()));
+}
+```
+
+If the merged result has an upper bound, the contributor adds `@Max(value)`.
+
+Example:
+
+- `max = 60`
+- valid values: `60`, `59`
+- invalid values: `61`
+
+### Step 6: apply `@Size`
+
+```java
+if (effectiveConstraints.sizeMin() != null || effectiveConstraints.sizeMax() != null) {
+	SizeDef sizeDef = new SizeDef();
+	if (effectiveConstraints.sizeMin() != null) {
+		sizeDef.min(effectiveConstraints.sizeMin());
+	}
+	if (effectiveConstraints.sizeMax() != null) {
+		sizeDef.max(effectiveConstraints.sizeMax());
+	}
+	propertyContext.constraint(sizeDef);
+}
+```
+
+This creates one `SizeDef` object and sets the available sides.
+
+That matches how `@Size` works: one constraint with two optional parameters.
+
+Supported shapes:
+
+- min only
+- max only
+- both
+
+Examples:
+
+- `sizeMin = 4`, `sizeMax = null` means length/count must be at least 4
+- `sizeMin = null`, `sizeMax = 30` means length/count must be at most 30
+- `sizeMin = 4`, `sizeMax = 30` means both
+
+### Step 7: apply `@Pattern`
+
+```java
+for (PatternRule patternRule : effectiveConstraints.patterns()) {
+	PatternDef patternDef = new PatternDef().regexp(patternRule.regex());
+	if (!patternRule.flags().isEmpty()) {
+		patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
+	}
+	propertyContext.constraint(patternDef);
+}
+```
+
+This loop adds one `@Pattern` constraint for every effective regex rule.
+
+The project uses `PatternRule` instead of raw strings because a regex may also carry flags such as:
+
+- `CASE_INSENSITIVE`
+- `MULTILINE`
+
+Each `PatternRule` contains:
+
+- `regex`
+- `flags`
+
+The contributor recreates that rule as a Hibernate Validator `PatternDef`.
+
+### Important behavior: multiple patterns are cumulative
+
+If a field ends up with multiple patterns, all of them are applied.
+
+That means the field value must satisfy every pattern, not just one.
+
+Example:
+
+- baseline pattern: `^[A-Za-z ]+$`
+- configured pattern: `^[A-Za-z]+$`
+
+The final field accepts only values that satisfy both.
+
+So `"John Doe"`:
+
+- matches `^[A-Za-z ]+$`
+- does not match `^[A-Za-z]+$`
+
+Result: validation fails.
+
+That is why configured patterns act as a hardening mechanism in this project.
+
+## `ConstraintMergeService.merge(...)`
+
+Source: `ConstraintMergeService`
+
+This method takes:
+
+- baseline constraints from code
+- configured constraints from properties
+
+and produces one `EffectiveFieldConstraints`.
+
+This is the method that decides what "stronger" means.
+
+### Input normalization
+
+```java
+ValidationProperties.Constraints effectiveConfig =
+	(configuredConstraints == null) ? new ValidationProperties.Constraints() : configuredConstraints;
+```
+
+If the field has no config, the method uses an empty config object instead of working with null.
+
+That keeps the rest of the logic simple.
+
+### Boolean constraints: `notNull` and `notBlank`
+
+```java
+boolean notNull = baseline.notNull()
+	|| isTrue(effectiveConfig.getNotNull().getValue())
+	|| isTrue(effectiveConfig.getNotNull().getHardValue());
+boolean notBlank = baseline.notBlank()
+	|| isTrue(effectiveConfig.getNotBlank().getValue())
+	|| isTrue(effectiveConfig.getNotBlank().getHardValue());
+```
+
+These are merged with OR semantics.
+
+If any source says the constraint should be enabled, the final result is enabled.
+
+That means the config can make a field stricter, but not weaker.
+
+Example:
+
+- baseline has `@NotNull`
+- config says `not-null.value=false`
+
+Result: still true, because baseline already required it.
+
+### Numeric lower bounds use the stricter lower limit
+
+```java
+Long min = strictestLowerBound(
+	baseline.min(),
+	effectiveConfig.getMin().getValue(),
+	effectiveConfig.getMin().getHardValue());
+```
+
+Lower bounds are merged by taking the maximum value.
+
+Why?
+
+Because for lower bounds, larger means stricter.
+
+Example:
+
+- baseline min = 18
+- configured min = 16
+- hard min = 21
+
+Result: 21
+
+The same logic applies to `sizeMin`.
+
+### Numeric upper bounds use the stricter upper limit
+
+```java
+Long max = strictestUpperBound(
+	baseline.max(),
+	effectiveConfig.getMax().getValue(),
+	effectiveConfig.getMax().getHardValue());
+```
+
+Upper bounds are merged by taking the minimum value.
+
+Why?
+
+Because for upper bounds, smaller means stricter.
+
+Example:
+
+- baseline max = 60
+- configured max = 70
+- hard max = 55
+
+Result: 55
+
+The same logic applies to `sizeMax`.
+
+### Size values are converted to `Integer`
+
+```java
+toSizeInteger(...)
+```
+
+Size in bean validation uses `int`, not `long`.
+
+So configured size values are validated and converted:
+
+- `null` stays null
+- negative values are rejected
+- values larger than `Integer.MAX_VALUE` are rejected
+- otherwise they are converted with `Math.toIntExact(...)`
+
+This is a defensive boundary so invalid configuration fails fast.
+
+### Incompatible merged ranges are rejected
+
+```java
+if (min != null && max != null && min > max) {
+	throw ...
+}
+if (sizeMin != null && sizeMax != null && sizeMin > sizeMax) {
+	throw ...
+}
+```
+
+Even if each individual piece looked valid, the final combination can still be impossible.
+
+Examples:
+
+- min = 70 and max = 50
+- sizeMin = 40 and sizeMax = 30
+
+The merge service rejects these immediately.
+
+### Patterns accumulate
+
+```java
+List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
+appendConfiguredPatterns(patterns, effectiveConfig.getPattern().getRegexes(), className, fieldName);
+```
+
+Patterns are not replaced.
+
+The baseline pattern list is copied first, then configured regexes are appended.
+
+That means configured patterns make the field stricter by adding more rules.
+
+### Configured regexes are validated
+
+`appendConfiguredPatterns(...)` does two checks before adding a regex:
+
+1. regex must not be null or empty
+2. regex must compile successfully
+
+If either check fails, the method throws `InvalidConstraintConfigurationException`.
+
+### Final result
+
+At the end, the method returns:
+
+```java
+new EffectiveFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns)
+```
+
+This object is the single source of truth for that field.
+
+## End-to-end example
+
+Assume `PersonForm.name` has these baseline annotations:
+
+```java
+@NotNull
+@NotBlank
+@Size(min = 3, max = 30)
+@Pattern(regexp = "^[A-Za-z ]+$")
+private String name;
+```
+
+And config adds:
+
+```yaml
+validation:
+  mappings:
+    - class-name: com.example.validatingforminput.PersonForm
+      fields:
+        - field-name: name
+          constraints:
+            size:
+              min:
+                value: 4
+              max:
+                value: 40
+            pattern:
+              regexes:
+                - ^[A-Za-z]+$
+```
+
+### Baseline extracted from annotations
+
+- `notNull = true`
+- `notBlank = true`
+- `sizeMin = 3`
+- `sizeMax = 30`
+- `patterns = ["^[A-Za-z ]+$"]`
+
+### Configured constraints
+
+- `sizeMin = 4`
+- `sizeMax = 40`
+- `patterns = ["^[A-Za-z]+$"]`
+
+### After merge
+
+- `notNull = true`
+- `notBlank = true`
+- `sizeMin = 4` because max(3, 4) = 4
+- `sizeMax = 30` because min(30, 40) = 30
+- `patterns = ["^[A-Za-z ]+$", "^[A-Za-z]+$"]`
+
+### What `applyConstraints(...)` installs
+
+- `@NotNull`
+- `@NotBlank`
+- `@Size(min = 4, max = 30)`
+- `@Pattern(regexp = "^[A-Za-z ]+$")`
+- `@Pattern(regexp = "^[A-Za-z]+$")`
+
+So the effective validation behavior is:
+
+- name cannot be null
+- name cannot be blank
+- name length must be between 4 and 30
+- name may only contain letters and spaces
+- name may also satisfy the stricter no-space regex
+
+Because both patterns are active, `"John Doe"` fails.
+
+## What the contributor does not do
+
+The contributor is not responsible for:
+
+- class lookup
+- field lookup
+- duplicate detection
+- extracting annotations
+- determining stricter min/max
+- validating regex syntax
+- validating impossible min/max combinations
+
+Those concerns are intentionally handled before or outside `applyConstraints(...)`.
+
+This separation keeps the code easier to reason about:
+
+- metadata code resolves what exists
+- merge code decides the final policy
+- contributor code installs the final rules
+
+## Practical summary
+
+If you want to reason about a validation result:
+
+1. Look at baseline annotations on the field and getter.
+2. Look at configured properties for that field.
+3. Look at how `ConstraintMergeService.merge(...)` combines them.
+4. Look at `applyConstraints(...)` to see how the merged result becomes real runtime constraints.
+
+If you want to change behavior:
+
+- change metadata extraction if the app is missing baseline annotations
+- change merge logic if you want different precedence or hardening rules
+- change `applyConstraints(...)` only if you want to emit different validator definitions
+
+Most policy changes belong in `ConstraintMergeService`, not in the contributor.

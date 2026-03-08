@@ -63,6 +63,7 @@ public class GeneratedClassMetadataCache {
 				}
 
 				Field field = resolveField(clazz, className, fieldName);
+				validateConfiguredConstraints(className, field, fieldMapping.getConstraints());
 				BaselineFieldConstraints baseline = extractBaseline(clazz, field);
 				fieldMappingIndex.put(fieldName, new ResolvedFieldMapping(fieldName, baseline));
 			}
@@ -119,6 +120,32 @@ public class GeneratedClassMetadataCache {
 		collectAnnotationBaseline(field, baselineAccumulator);
 		findGetter(clazz, field.getName()).ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator));
 		return baselineAccumulator.toBaseline();
+	}
+
+	private void validateConfiguredConstraints(
+		String className,
+		Field field,
+		ValidationProperties.Constraints constraints
+	) {
+		if (constraints == null) {
+			return;
+		}
+
+		Class<?> fieldType = wrapPrimitive(field.getType());
+		String fieldName = field.getName();
+
+		if (isNotBlankEnabled(constraints) && !supportsCharSequence(fieldType)) {
+			throw unsupportedConstraint("notBlank", className, fieldName, fieldType);
+		}
+		if (hasNumericBounds(constraints) && !supportsNumericBounds(fieldType)) {
+			throw unsupportedConstraint("min/max", className, fieldName, fieldType);
+		}
+		if (hasSizeBounds(constraints) && !supportsSize(field.getType())) {
+			throw unsupportedConstraint("size", className, fieldName, field.getType());
+		}
+		if (hasConfiguredPatterns(constraints) && !supportsCharSequence(fieldType)) {
+			throw unsupportedConstraint("pattern", className, fieldName, fieldType);
+		}
 	}
 
 	private void collectAnnotationBaseline(AnnotatedElement element, BaselineAccumulator baselineAccumulator) {
@@ -189,6 +216,87 @@ public class GeneratedClassMetadataCache {
 
 	private Integer minNullable(Integer first, int second) {
 		return (first == null) ? second : Math.min(first, second);
+	}
+
+	private boolean isNotBlankEnabled(ValidationProperties.Constraints constraints) {
+		return Boolean.TRUE.equals(constraints.getNotBlank().getValue())
+			|| Boolean.TRUE.equals(constraints.getNotBlank().getHardValue());
+	}
+
+	private boolean hasNumericBounds(ValidationProperties.Constraints constraints) {
+		return constraints.getMin().getValue() != null
+			|| constraints.getMin().getHardValue() != null
+			|| constraints.getMax().getValue() != null
+			|| constraints.getMax().getHardValue() != null;
+	}
+
+	private boolean hasSizeBounds(ValidationProperties.Constraints constraints) {
+		return constraints.getSize().getMin().getValue() != null
+			|| constraints.getSize().getMin().getHardValue() != null
+			|| constraints.getSize().getMax().getValue() != null
+			|| constraints.getSize().getMax().getHardValue() != null;
+	}
+
+	private boolean hasConfiguredPatterns(ValidationProperties.Constraints constraints) {
+		return !constraints.getPattern().getRegexes().isEmpty();
+	}
+
+	private boolean supportsCharSequence(Class<?> fieldType) {
+		return CharSequence.class.isAssignableFrom(fieldType);
+	}
+
+	private boolean supportsNumericBounds(Class<?> fieldType) {
+		return supportsCharSequence(fieldType)
+			|| Number.class.isAssignableFrom(fieldType);
+	}
+
+	private boolean supportsSize(Class<?> fieldType) {
+		return fieldType.isArray()
+			|| CharSequence.class.isAssignableFrom(fieldType)
+			|| java.util.Collection.class.isAssignableFrom(fieldType)
+			|| java.util.Map.class.isAssignableFrom(fieldType);
+	}
+
+	private Class<?> wrapPrimitive(Class<?> fieldType) {
+		if (!fieldType.isPrimitive()) {
+			return fieldType;
+		}
+		if (fieldType == boolean.class) {
+			return Boolean.class;
+		}
+		if (fieldType == byte.class) {
+			return Byte.class;
+		}
+		if (fieldType == short.class) {
+			return Short.class;
+		}
+		if (fieldType == int.class) {
+			return Integer.class;
+		}
+		if (fieldType == long.class) {
+			return Long.class;
+		}
+		if (fieldType == float.class) {
+			return Float.class;
+		}
+		if (fieldType == double.class) {
+			return Double.class;
+		}
+		if (fieldType == char.class) {
+			return Character.class;
+		}
+		return fieldType;
+	}
+
+	private InvalidConstraintConfigurationException unsupportedConstraint(
+		String constraintName,
+		String className,
+		String fieldName,
+		Class<?> fieldType
+	) {
+		return new InvalidConstraintConfigurationException(
+			"Constraint " + constraintName + " is not supported for class="
+				+ className + ", field=" + fieldName + ", fieldType=" + fieldType.getName());
 	}
 
 	private static final class BaselineAccumulator {
