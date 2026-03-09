@@ -6,8 +6,8 @@ import java.util.Map;
 import org.hibernate.validator.cfg.ConstraintMapping;
 import org.hibernate.validator.cfg.context.PropertyConstraintMappingContext;
 import org.hibernate.validator.cfg.context.TypeConstraintMappingContext;
-import org.hibernate.validator.cfg.defs.MaxDef;
-import org.hibernate.validator.cfg.defs.MinDef;
+import org.hibernate.validator.cfg.defs.DecimalMaxDef;
+import org.hibernate.validator.cfg.defs.DecimalMinDef;
 import org.hibernate.validator.cfg.defs.NotBlankDef;
 import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
@@ -77,10 +77,14 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 			propertyContext.constraint(new NotBlankDef());
 		}
 		if (effectiveConstraints.min() != null) {
-			propertyContext.constraint(new MinDef().value(effectiveConstraints.min()));
+			propertyContext.constraint(new DecimalMinDef()
+				.value(effectiveConstraints.min().value().toPlainString())
+				.inclusive(effectiveConstraints.min().inclusive()));
 		}
 		if (effectiveConstraints.max() != null) {
-			propertyContext.constraint(new MaxDef().value(effectiveConstraints.max()));
+			propertyContext.constraint(new DecimalMaxDef()
+				.value(effectiveConstraints.max().value().toPlainString())
+				.inclusive(effectiveConstraints.max().inclusive()));
 		}
 		if (effectiveConstraints.sizeMin() != null || effectiveConstraints.sizeMax() != null) {
 			SizeDef sizeDef = new SizeDef();

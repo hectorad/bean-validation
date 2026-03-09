@@ -18,6 +18,13 @@ com.ampp:
             not-null:
               value: true
             min:
-              value: 18
+              value: 20
             max:
               value: 60
+        - field-name: salary
+          constraints:
+            decimal-min:
+              value: 1000.1
+              inclusive: false
+            decimal-max:
+              value: 250000.00

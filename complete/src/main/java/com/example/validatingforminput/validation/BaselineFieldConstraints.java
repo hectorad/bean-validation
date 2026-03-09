@@ -6,8 +6,8 @@ import java.util.List;
 public record BaselineFieldConstraints(
 	boolean notNull,
 	boolean notBlank,
-	Long min,
-	Long max,
+	NumericBound min,
+	NumericBound max,
 	Integer sizeMin,
 	Integer sizeMax,
 	List<PatternRule> patterns

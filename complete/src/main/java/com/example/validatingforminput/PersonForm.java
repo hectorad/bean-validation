@@ -1,6 +1,8 @@
 package com.example.validatingforminput;
 
 
+import java.math.BigDecimal;
+
 import jakarta.validation.constraints.*;
 
 public class PersonForm {
@@ -15,6 +17,10 @@ public class PersonForm {
 	@Min(18)
 	@Max(60)
 	private Integer age;
+
+	@DecimalMin(value = "1000.00", inclusive = false)
+	@DecimalMax("250000.00")
+	private BigDecimal salary;
 
 	public String getName() {
 		return this.name;
@@ -32,7 +38,15 @@ public class PersonForm {
 		this.age = age;
 	}
 
+	public BigDecimal getSalary() {
+		return salary;
+	}
+
+	public void setSalary(BigDecimal salary) {
+		this.salary = salary;
+	}
+
 	public String toString() {
-		return "Person(Name: " + this.name + ", Age: " + this.age + ")";
+		return "Person(Name: " + this.name + ", Age: " + this.age + ", Salary: " + this.salary + ")";
 	}
 }

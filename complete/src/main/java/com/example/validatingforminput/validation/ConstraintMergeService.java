@@ -1,5 +1,6 @@
 package com.example.validatingforminput.validation;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.PatternSyntaxException;
@@ -25,29 +26,53 @@ public class ConstraintMergeService {
 			|| isTrue(effectiveConfig.getNotBlank().getValue())
 			|| isTrue(effectiveConfig.getNotBlank().getHardValue());
 
-		Long min = strictestLowerBound(
+		NumericBound min = strictestLowerBound(
 			baseline.min(),
-			effectiveConfig.getMin().getValue(),
-			effectiveConfig.getMin().getHardValue());
-		Long max = strictestUpperBound(
+			toInclusiveBound(effectiveConfig.getMin().getValue()),
+			toInclusiveBound(effectiveConfig.getMin().getHardValue()),
+			toDecimalBound(
+				effectiveConfig.getDecimalMin().getValue(),
+				effectiveConfig.getDecimalMin().getInclusive(),
+				className,
+				fieldName,
+				"decimal-min.value",
+				"decimal-min.inclusive"),
+			toDecimalBound(
+				effectiveConfig.getDecimalMin().getHardValue(),
+				effectiveConfig.getDecimalMin().getHardInclusive(),
+				className,
+				fieldName,
+				"decimal-min.hard-value",
+				"decimal-min.hard-inclusive"));
+		NumericBound max = strictestUpperBound(
 			baseline.max(),
-			effectiveConfig.getMax().getValue(),
-			effectiveConfig.getMax().getHardValue());
+			toInclusiveBound(effectiveConfig.getMax().getValue()),
+			toInclusiveBound(effectiveConfig.getMax().getHardValue()),
+			toDecimalBound(
+				effectiveConfig.getDecimalMax().getValue(),
+				effectiveConfig.getDecimalMax().getInclusive(),
+				className,
+				fieldName,
+				"decimal-max.value",
+				"decimal-max.inclusive"),
+			toDecimalBound(
+				effectiveConfig.getDecimalMax().getHardValue(),
+				effectiveConfig.getDecimalMax().getHardInclusive(),
+				className,
+				fieldName,
+				"decimal-max.hard-value",
+				"decimal-max.hard-inclusive"));
 
-		Integer sizeMin = strictestLowerBound(
+		Integer sizeMin = strictestComparableLowerBound(
 			baseline.sizeMin(),
 			toSizeInteger(effectiveConfig.getSize().getMin().getValue(), className, fieldName, "size.min.value"),
 			toSizeInteger(effectiveConfig.getSize().getMin().getHardValue(), className, fieldName, "size.min.hardValue"));
-		Integer sizeMax = strictestUpperBound(
+		Integer sizeMax = strictestComparableUpperBound(
 			baseline.sizeMax(),
 			toSizeInteger(effectiveConfig.getSize().getMax().getValue(), className, fieldName, "size.max.value"),
 			toSizeInteger(effectiveConfig.getSize().getMax().getHardValue(), className, fieldName, "size.max.hardValue"));
 
-		if (min != null && max != null && min > max) {
-			throw new InvalidConstraintConfigurationException(
-				"Invalid numeric constraints. effectiveMin > effectiveMax for class="
-					+ className + ", field=" + fieldName + ", effectiveMin=" + min + ", effectiveMax=" + max);
-		}
+		validateNumericBounds(min, max, className, fieldName);
 		if (sizeMin != null && sizeMax != null && sizeMin > sizeMax) {
 			throw new InvalidConstraintConfigurationException(
 				"Invalid size constraints. effectiveSizeMin > effectiveSizeMax for class="
@@ -64,34 +89,98 @@ public class ConstraintMergeService {
 		return Boolean.TRUE.equals(value);
 	}
 
-	private <N extends Number & Comparable<N>> N strictestLowerBound(N baseline, N configured, N hard) {
-		N result = baseline;
-		if (configured != null) {
-			result = (result == null) ? configured : max(result, configured);
-		}
-		if (hard != null) {
-			result = (result == null) ? hard : max(result, hard);
+	private NumericBound strictestLowerBound(NumericBound... bounds) {
+		NumericBound result = null;
+		for (NumericBound bound : bounds) {
+			result = NumericBound.stricterLower(result, bound);
 		}
 		return result;
 	}
 
-	private <N extends Number & Comparable<N>> N strictestUpperBound(N baseline, N configured, N hard) {
-		N result = baseline;
-		if (configured != null) {
-			result = (result == null) ? configured : min(result, configured);
-		}
-		if (hard != null) {
-			result = (result == null) ? hard : min(result, hard);
+	private NumericBound strictestUpperBound(NumericBound... bounds) {
+		NumericBound result = null;
+		for (NumericBound bound : bounds) {
+			result = NumericBound.stricterUpper(result, bound);
 		}
 		return result;
 	}
 
-	private <N extends Comparable<N>> N max(N first, N second) {
-		return (first.compareTo(second) >= 0) ? first : second;
+	@SafeVarargs
+	private final <N extends Comparable<N>> N strictestComparableLowerBound(N... bounds) {
+		N result = null;
+		for (N bound : bounds) {
+			if (bound == null) {
+				continue;
+			}
+			if (result == null || bound.compareTo(result) > 0) {
+				result = bound;
+			}
+		}
+		return result;
 	}
 
-	private <N extends Comparable<N>> N min(N first, N second) {
-		return (first.compareTo(second) <= 0) ? first : second;
+	@SafeVarargs
+	private final <N extends Comparable<N>> N strictestComparableUpperBound(N... bounds) {
+		N result = null;
+		for (N bound : bounds) {
+			if (bound == null) {
+				continue;
+			}
+			if (result == null || bound.compareTo(result) < 0) {
+				result = bound;
+			}
+		}
+		return result;
+	}
+
+	private NumericBound toInclusiveBound(Long value) {
+		return (value == null) ? null : NumericBound.inclusive(value);
+	}
+
+	private NumericBound toDecimalBound(
+		BigDecimal value,
+		Boolean inclusive,
+		String className,
+		String fieldName,
+		String valuePropertyName,
+		String inclusivePropertyName
+	) {
+		if (value == null) {
+			if (inclusive != null) {
+				throw new InvalidConstraintConfigurationException(
+					"Invalid decimal constraint. " + inclusivePropertyName + " requires " + valuePropertyName
+						+ " for class=" + className + ", field=" + fieldName);
+			}
+			return null;
+		}
+		return new NumericBound(value, inclusive == null || inclusive);
+	}
+
+	private void validateNumericBounds(
+		NumericBound min,
+		NumericBound max,
+		String className,
+		String fieldName
+	) {
+		if (min == null || max == null) {
+			return;
+		}
+
+		int comparison = min.value().compareTo(max.value());
+		if (comparison > 0) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid numeric constraints. effectiveMin > effectiveMax for class="
+					+ className + ", field=" + fieldName + ", effectiveMin=" + render(min) + ", effectiveMax=" + render(max));
+		}
+		if (comparison == 0 && (!min.inclusive() || !max.inclusive())) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid numeric constraints. equal bounds cannot be exclusive for class="
+					+ className + ", field=" + fieldName + ", effectiveMin=" + render(min) + ", effectiveMax=" + render(max));
+		}
+	}
+
+	private String render(NumericBound bound) {
+		return bound.value().toPlainString() + " (inclusive=" + bound.inclusive() + ")";
 	}
 
 	private void appendConfiguredPatterns(

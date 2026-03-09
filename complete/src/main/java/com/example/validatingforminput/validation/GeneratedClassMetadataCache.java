@@ -3,6 +3,8 @@ package com.example.validatingforminput.validation;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -14,6 +16,8 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -63,8 +67,8 @@ public class GeneratedClassMetadataCache {
 				}
 
 				Field field = resolveField(clazz, className, fieldName);
-				validateConfiguredConstraints(className, field, fieldMapping.getConstraints());
-				BaselineFieldConstraints baseline = extractBaseline(clazz, field);
+				BaselineFieldConstraints baseline = extractBaseline(clazz, field, className);
+				validateConstraints(className, field, baseline, fieldMapping.getConstraints());
 				fieldMappingIndex.put(fieldName, new ResolvedFieldMapping(fieldName, baseline));
 			}
 
@@ -115,20 +119,22 @@ public class GeneratedClassMetadataCache {
 			"Configured field was not found. class=" + className + ", field=" + fieldName);
 	}
 
-	private BaselineFieldConstraints extractBaseline(Class<?> clazz, Field field) {
+	private BaselineFieldConstraints extractBaseline(Class<?> clazz, Field field, String className) {
 		BaselineAccumulator baselineAccumulator = new BaselineAccumulator();
-		collectAnnotationBaseline(field, baselineAccumulator);
-		findGetter(clazz, field.getName()).ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator));
+		collectAnnotationBaseline(field, baselineAccumulator, className, field.getName());
+		findGetter(clazz, field.getName())
+			.ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator, className, field.getName()));
 		return baselineAccumulator.toBaseline();
 	}
 
-	private void validateConfiguredConstraints(
+	private void validateConstraints(
 		String className,
 		Field field,
+		BaselineFieldConstraints baseline,
 		ValidationProperties.Constraints constraints
 	) {
 		if (constraints == null) {
-			return;
+			constraints = new ValidationProperties.Constraints();
 		}
 
 		Class<?> fieldType = wrapPrimitive(field.getType());
@@ -137,8 +143,8 @@ public class GeneratedClassMetadataCache {
 		if (isNotBlankEnabled(constraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("notBlank", className, fieldName, fieldType);
 		}
-		if (hasNumericBounds(constraints) && !supportsNumericBounds(fieldType)) {
-			throw unsupportedConstraint("min/max", className, fieldName, fieldType);
+		if ((hasNumericBounds(baseline) || hasNumericBounds(constraints)) && !supportsNumericBounds(fieldType)) {
+			throw unsupportedConstraint("numeric bounds", className, fieldName, fieldType);
 		}
 		if (hasSizeBounds(constraints) && !supportsSize(field.getType())) {
 			throw unsupportedConstraint("size", className, fieldName, field.getType());
@@ -148,7 +154,12 @@ public class GeneratedClassMetadataCache {
 		}
 	}
 
-	private void collectAnnotationBaseline(AnnotatedElement element, BaselineAccumulator baselineAccumulator) {
+	private void collectAnnotationBaseline(
+		AnnotatedElement element,
+		BaselineAccumulator baselineAccumulator,
+		String className,
+		String fieldName
+	) {
 		if (element == null) {
 			return;
 		}
@@ -161,10 +172,20 @@ public class GeneratedClassMetadataCache {
 		}
 
 		for (Min min : element.getAnnotationsByType(Min.class)) {
-			baselineAccumulator.min = maxNullable(baselineAccumulator.min, min.value());
+			baselineAccumulator.min = NumericBound.stricterLower(baselineAccumulator.min, NumericBound.inclusive(min.value()));
 		}
 		for (Max max : element.getAnnotationsByType(Max.class)) {
-			baselineAccumulator.max = minNullable(baselineAccumulator.max, max.value());
+			baselineAccumulator.max = NumericBound.stricterUpper(baselineAccumulator.max, NumericBound.inclusive(max.value()));
+		}
+		for (DecimalMin decimalMin : element.getAnnotationsByType(DecimalMin.class)) {
+			baselineAccumulator.min = NumericBound.stricterLower(
+				baselineAccumulator.min,
+				parseDecimalAnnotationBound(decimalMin.value(), decimalMin.inclusive(), className, fieldName, "DecimalMin"));
+		}
+		for (DecimalMax decimalMax : element.getAnnotationsByType(DecimalMax.class)) {
+			baselineAccumulator.max = NumericBound.stricterUpper(
+				baselineAccumulator.max,
+				parseDecimalAnnotationBound(decimalMax.value(), decimalMax.inclusive(), className, fieldName, "DecimalMax"));
 		}
 		for (Size size : element.getAnnotationsByType(Size.class)) {
 			baselineAccumulator.sizeMin = maxNullable(baselineAccumulator.sizeMin, size.min());
@@ -210,6 +231,24 @@ public class GeneratedClassMetadataCache {
 		return (first == null) ? second : Math.min(first, second);
 	}
 
+	private NumericBound parseDecimalAnnotationBound(
+		String value,
+		boolean inclusive,
+		String className,
+		String fieldName,
+		String annotationName
+	) {
+		try {
+			return new NumericBound(new BigDecimal(value), inclusive);
+		}
+		catch (NumberFormatException exception) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid " + annotationName + " annotation. value could not be parsed for class="
+					+ className + ", field=" + fieldName + ", value=" + value,
+				exception);
+		}
+	}
+
 	private Integer maxNullable(Integer first, int second) {
 		return (first == null) ? second : Math.max(first, second);
 	}
@@ -223,11 +262,23 @@ public class GeneratedClassMetadataCache {
 			|| Boolean.TRUE.equals(constraints.getNotBlank().getHardValue());
 	}
 
+	private boolean hasNumericBounds(BaselineFieldConstraints baseline) {
+		return baseline.min() != null || baseline.max() != null;
+	}
+
 	private boolean hasNumericBounds(ValidationProperties.Constraints constraints) {
 		return constraints.getMin().getValue() != null
 			|| constraints.getMin().getHardValue() != null
 			|| constraints.getMax().getValue() != null
-			|| constraints.getMax().getHardValue() != null;
+			|| constraints.getMax().getHardValue() != null
+			|| constraints.getDecimalMin().getValue() != null
+			|| constraints.getDecimalMin().getHardValue() != null
+			|| constraints.getDecimalMin().getInclusive() != null
+			|| constraints.getDecimalMin().getHardInclusive() != null
+			|| constraints.getDecimalMax().getValue() != null
+			|| constraints.getDecimalMax().getHardValue() != null
+			|| constraints.getDecimalMax().getInclusive() != null
+			|| constraints.getDecimalMax().getHardInclusive() != null;
 	}
 
 	private boolean hasSizeBounds(ValidationProperties.Constraints constraints) {
@@ -247,7 +298,12 @@ public class GeneratedClassMetadataCache {
 
 	private boolean supportsNumericBounds(Class<?> fieldType) {
 		return supportsCharSequence(fieldType)
-			|| Number.class.isAssignableFrom(fieldType);
+			|| fieldType == BigDecimal.class
+			|| fieldType == BigInteger.class
+			|| fieldType == Byte.class
+			|| fieldType == Short.class
+			|| fieldType == Integer.class
+			|| fieldType == Long.class;
 	}
 
 	private boolean supportsSize(Class<?> fieldType) {
@@ -305,9 +361,9 @@ public class GeneratedClassMetadataCache {
 
 		private boolean notBlank;
 
-		private Long min;
+		private NumericBound min;
 
-		private Long max;
+		private NumericBound max;
 
 		private Integer sizeMin;
 

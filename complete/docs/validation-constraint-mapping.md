@@ -37,6 +37,8 @@ Represents what was already declared in code with annotations like:
 - `@NotBlank`
 - `@Min`
 - `@Max`
+- `@DecimalMin`
+- `@DecimalMax`
 - `@Size`
 - `@Pattern`
 
@@ -49,22 +51,31 @@ Represents what came from `application.yml` or other Spring config sources.
 Examples:
 
 ```yaml
-com.ampp.business-validation-override:
-  mappings:
-    - full-class-name: com.example.validatingforminput.PersonForm
-      fields:
-        - field-name: name
-          constraints:
-            not-blank:
-              value: true
-            size:
-              min:
-                value: 4
-              max:
-                value: 40
-            pattern:
-              regexes:
-                - ^[A-Za-z]+$
+com:
+  ampp:
+    business-validation-override:
+      - full-class-name: com.example.validatingforminput.PersonForm
+        fields:
+          - field-name: name
+            constraints:
+              not-blank:
+                value: true
+              size:
+                min:
+                  value: 4
+                max:
+                  value: 40
+              pattern:
+                regexes:
+                  - ^[A-Za-z]+$
+          - field-name: age
+            constraints:
+              decimal-min:
+                value: 25.5
+                inclusive: false
+              decimal-max:
+                value: 58.5
+                inclusive: false
 ```
 
 ### `EffectiveFieldConstraints`
@@ -75,13 +86,13 @@ It contains:
 
 - `notNull`
 - `notBlank`
-- `min`
-- `max`
+- `min` as a `NumericBound`
+- `max` as a `NumericBound`
 - `sizeMin`
 - `sizeMax`
 - `patterns`
 
-If `EffectiveFieldConstraints` says `min = 25`, then the contributor will add a programmatic `@Min(25)`.
+If `EffectiveFieldConstraints` says `min = NumericBound(25.5, false)`, then the contributor will add a programmatic `@DecimalMin(value = "25.5", inclusive = false)`.
 
 ## `createConstraintMappings(...)`
 
@@ -279,37 +290,41 @@ If both `notNull` and `notBlank` are true, both constraints are added.
 
 That is logically redundant but harmless.
 
-### Step 4: apply `@Min`
+### Step 4: apply `@DecimalMin`
 
 ```java
 if (effectiveConstraints.min() != null) {
-	propertyContext.constraint(new MinDef().value(effectiveConstraints.min()));
+	propertyContext.constraint(new DecimalMinDef()
+		.value(effectiveConstraints.min().value().toPlainString())
+		.inclusive(effectiveConstraints.min().inclusive()));
 }
 ```
 
-If the merged result has a numeric lower bound, the contributor adds `@Min(value)`.
+If the merged result has a numeric lower bound, the contributor adds `@DecimalMin`.
 
 Example:
 
-- `min = 25`
-- valid values: `25`, `26`, `30`
-- invalid values: `24`, `0`
+- `min = NumericBound(25.5, false)`
+- valid values: `26`, `30`
+- invalid values: `25`, `24`
 
-### Step 5: apply `@Max`
+### Step 5: apply `@DecimalMax`
 
 ```java
 if (effectiveConstraints.max() != null) {
-	propertyContext.constraint(new MaxDef().value(effectiveConstraints.max()));
+	propertyContext.constraint(new DecimalMaxDef()
+		.value(effectiveConstraints.max().value().toPlainString())
+		.inclusive(effectiveConstraints.max().inclusive()));
 }
 ```
 
-If the merged result has an upper bound, the contributor adds `@Max(value)`.
+If the merged result has an upper bound, the contributor adds `@DecimalMax`.
 
 Example:
 
-- `max = 60`
-- valid values: `60`, `59`
-- invalid values: `61`
+- `max = NumericBound(58.5, false)`
+- valid values: `58`, `40`
+- invalid values: `59`
 
 ### Step 6: apply `@Size`
 
@@ -441,13 +456,13 @@ Result: still true, because baseline already required it.
 ### Numeric lower bounds use the stricter lower limit
 
 ```java
-Long min = strictestLowerBound(
+NumericBound min = strictestLowerBound(
 	baseline.min(),
-	effectiveConfig.getMin().getValue(),
-	effectiveConfig.getMin().getHardValue());
+	toInclusiveBound(effectiveConfig.getMin().getValue()),
+	toDecimalBound(effectiveConfig.getDecimalMin().getValue(), ...));
 ```
 
-Lower bounds are merged by taking the maximum value.
+Lower bounds are merged by taking the highest numeric value.
 
 Why?
 
@@ -457,22 +472,25 @@ Example:
 
 - baseline min = 18
 - configured min = 16
+- decimal min = 18.5 exclusive
 - hard min = 21
 
 Result: 21
 
-The same logic applies to `sizeMin`.
+If two lower bounds have the same numeric value, exclusive is stricter than inclusive.
+
+The same logic still applies to `sizeMin`.
 
 ### Numeric upper bounds use the stricter upper limit
 
 ```java
-Long max = strictestUpperBound(
+NumericBound max = strictestUpperBound(
 	baseline.max(),
-	effectiveConfig.getMax().getValue(),
-	effectiveConfig.getMax().getHardValue());
+	toInclusiveBound(effectiveConfig.getMax().getValue()),
+	toDecimalBound(effectiveConfig.getDecimalMax().getValue(), ...));
 ```
 
-Upper bounds are merged by taking the minimum value.
+Upper bounds are merged by taking the lowest numeric value.
 
 Why?
 
@@ -482,11 +500,14 @@ Example:
 
 - baseline max = 60
 - configured max = 70
+- decimal max = 60.5 exclusive
 - hard max = 55
 
 Result: 55
 
-The same logic applies to `sizeMax`.
+If two upper bounds have the same numeric value, exclusive is stricter than inclusive.
+
+The same logic still applies to `sizeMax`.
 
 ### Size values are converted to `Integer`
 
@@ -521,6 +542,7 @@ Even if each individual piece looked valid, the final combination can still be i
 Examples:
 
 - min = 70 and max = 50
+- min = 10 exclusive and max = 10 inclusive
 - sizeMin = 40 and sizeMax = 30
 
 The merge service rejects these immediately.
@@ -572,20 +594,21 @@ private String name;
 And config adds:
 
 ```yaml
-com.ampp.business-validation-override:
-  mappings:
-    - full-class-name: com.example.validatingforminput.PersonForm
-      fields:
-        - field-name: name
-          constraints:
-            size:
-              min:
-                value: 4
-              max:
-                value: 40
-            pattern:
-              regexes:
-                - ^[A-Za-z]+$
+com:
+  ampp:
+    business-validation-override:
+      - full-class-name: com.example.validatingforminput.PersonForm
+        fields:
+          - field-name: name
+            constraints:
+              size:
+                min:
+                  value: 4
+                max:
+                  value: 40
+              pattern:
+                regexes:
+                  - ^[A-Za-z]+$
 ```
 
 ### Baseline extracted from annotations

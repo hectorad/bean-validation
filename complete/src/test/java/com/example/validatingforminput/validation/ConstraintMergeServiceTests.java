@@ -3,6 +3,7 @@ package com.example.validatingforminput.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
@@ -15,26 +16,28 @@ class ConstraintMergeServiceTests {
 
 	@Test
 	void shouldKeepStricterLowerBoundUsingMaxRule() {
-		BaselineFieldConstraints baseline = new BaselineFieldConstraints(false, false, 18L, null, null, null, List.of());
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false, false, NumericBound.inclusive(18L), null, null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getMin().setValue(16L);
 		constraints.getMin().setHardValue(21L);
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
 
-		assertThat(effective.min()).isEqualTo(21L);
+		assertBound(effective.min(), "21", true);
 	}
 
 	@Test
 	void shouldKeepStricterUpperBoundUsingMinRule() {
-		BaselineFieldConstraints baseline = new BaselineFieldConstraints(false, false, null, 60L, null, null, List.of());
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false, false, null, NumericBound.inclusive(60L), null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getMax().setValue(70L);
 		constraints.getMax().setHardValue(55L);
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
 
-		assertThat(effective.max()).isEqualTo(55L);
+		assertBound(effective.max(), "55", true);
 	}
 
 	@Test
@@ -73,7 +76,8 @@ class ConstraintMergeServiceTests {
 
 	@Test
 	void shouldFailWhenEffectiveMinIsGreaterThanEffectiveMax() {
-		BaselineFieldConstraints baseline = new BaselineFieldConstraints(false, false, 18L, 60L, null, null, List.of());
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false, false, NumericBound.inclusive(18L), NumericBound.inclusive(60L), null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getMin().setValue(70L);
 		constraints.getMax().setValue(50L);
@@ -81,6 +85,59 @@ class ConstraintMergeServiceTests {
 		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
 			.hasMessageContaining("effectiveMin > effectiveMax");
+	}
+
+	@Test
+	void shouldChooseStricterDecimalLowerBoundAcrossIntegerAndDecimalSources() {
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false, false, NumericBound.inclusive(18L), null, null, null, List.of());
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getMin().setValue(20L);
+		constraints.getDecimalMin().setValue(new BigDecimal("20.5"));
+		constraints.getDecimalMin().setInclusive(false);
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
+
+		assertBound(effective.min(), "20.5", false);
+	}
+
+	@Test
+	void shouldPreferExclusiveBoundWhenValuesMatch() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getDecimalMin().setValue(new BigDecimal("21.0"));
+		constraints.getDecimalMin().setInclusive(true);
+		constraints.getDecimalMin().setHardValue(new BigDecimal("21"));
+		constraints.getDecimalMin().setHardInclusive(false);
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
+
+		assertBound(effective.min(), "21", false);
+	}
+
+	@Test
+	void shouldFailWhenEqualBoundsBecomeExclusive() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getDecimalMin().setValue(new BigDecimal("10"));
+		constraints.getDecimalMin().setInclusive(false);
+		constraints.getDecimalMax().setValue(new BigDecimal("10"));
+		constraints.getDecimalMax().setInclusive(true);
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("equal bounds cannot be exclusive");
+	}
+
+	@Test
+	void shouldFailWhenDecimalInclusiveFlagHasNoValue() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getDecimalMin().setInclusive(false);
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("decimal-min.inclusive requires decimal-min.value");
 	}
 
 	@Test
@@ -125,5 +182,11 @@ class ConstraintMergeServiceTests {
 		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
 			.hasMessageContaining("exceeds Integer.MAX_VALUE");
+	}
+
+	private void assertBound(NumericBound bound, String expectedValue, boolean expectedInclusive) {
+		assertThat(bound).isNotNull();
+		assertThat(bound.value()).isEqualByComparingTo(new BigDecimal(expectedValue));
+		assertThat(bound.inclusive()).isEqualTo(expectedInclusive);
 	}
 }

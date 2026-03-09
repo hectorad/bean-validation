@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.validation.annotation.Validated;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -91,6 +92,12 @@ public class ValidationProperties {
         private NumericConstraint max = new NumericConstraint();
 
         @Valid
+        private DecimalConstraint decimalMin = new DecimalConstraint();
+
+        @Valid
+        private DecimalConstraint decimalMax = new DecimalConstraint();
+
+        @Valid
         private SizeConstraint size = new SizeConstraint();
 
         @Valid
@@ -128,6 +135,22 @@ public class ValidationProperties {
             this.max = (max == null) ? new NumericConstraint() : max;
         }
 
+        public DecimalConstraint getDecimalMin() {
+            return decimalMin;
+        }
+
+        public void setDecimalMin(DecimalConstraint decimalMin) {
+            this.decimalMin = (decimalMin == null) ? new DecimalConstraint() : decimalMin;
+        }
+
+        public DecimalConstraint getDecimalMax() {
+            return decimalMax;
+        }
+
+        public void setDecimalMax(DecimalConstraint decimalMax) {
+            this.decimalMax = (decimalMax == null) ? new DecimalConstraint() : decimalMax;
+        }
+
         public SizeConstraint getSize() {
             return size;
         }
@@ -149,6 +172,8 @@ public class ValidationProperties {
                     || isEnabled(notBlank)
                     || hasNumericValue(min)
                     || hasNumericValue(max)
+                    || hasDecimalValue(decimalMin)
+                    || hasDecimalValue(decimalMax)
                     || hasNumericValue(size.getMin())
                     || hasNumericValue(size.getMax())
                     || !pattern.getRegexes().isEmpty();
@@ -160,6 +185,13 @@ public class ValidationProperties {
 
         private boolean hasNumericValue(NumericConstraint constraint) {
             return constraint.getValue() != null || constraint.getHardValue() != null;
+        }
+
+        private boolean hasDecimalValue(DecimalConstraint constraint) {
+            return constraint.getValue() != null
+                || constraint.getHardValue() != null
+                || constraint.getInclusive() != null
+                || constraint.getHardInclusive() != null;
         }
     }
 
@@ -206,6 +238,49 @@ public class ValidationProperties {
 
         public void setHardValue(Long hardValue) {
             this.hardValue = hardValue;
+        }
+    }
+
+    public static class DecimalConstraint {
+
+        private BigDecimal value;
+
+        private BigDecimal hardValue;
+
+        private Boolean inclusive;
+
+        private Boolean hardInclusive;
+
+        public BigDecimal getValue() {
+            return value;
+        }
+
+        public void setValue(BigDecimal value) {
+            this.value = value;
+        }
+
+        public BigDecimal getHardValue() {
+            return hardValue;
+        }
+
+        public void setHardValue(BigDecimal hardValue) {
+            this.hardValue = hardValue;
+        }
+
+        public Boolean getInclusive() {
+            return inclusive;
+        }
+
+        public void setInclusive(Boolean inclusive) {
+            this.inclusive = inclusive;
+        }
+
+        public Boolean getHardInclusive() {
+            return hardInclusive;
+        }
+
+        public void setHardInclusive(Boolean hardInclusive) {
+            this.hardInclusive = hardInclusive;
         }
     }
 
