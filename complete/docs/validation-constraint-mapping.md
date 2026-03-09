@@ -61,28 +61,35 @@ com:
             constraints:
               not-blank:
                 value: true
+                message: Name is required
               size:
                 min:
                   value: 4
+                  message: Name must have at least 4 characters
                 max:
                   value: 40
+                  message: Name must have at most 40 characters
               pattern:
                 regexes:
                   - ^[A-Za-z]+$
+                message: Name must contain only letters
           - field-name: age
             constraints:
               decimal-min:
                 value: 25.5
                 inclusive: false
+                message: Age must be greater than 25.5
               decimal-max:
                 value: 58.5
                 inclusive: false
+                message: Age must be lower than 58.5
           - field-name: extensions
             constraints:
               extensions:
                 rules:
                   - json-path: $.vendorExtensionCode
                     regex: ^[A-Z]{3}-[0-9]{4}$
+                    message: Vendor extension code is invalid
 ```
 
 ### `EffectiveFieldConstraints`
@@ -92,11 +99,17 @@ This is the final merged view used by the contributor.
 It contains:
 
 - `notNull`
+- `notNullMessage`
 - `notBlank`
+- `notBlankMessage`
 - `min` as a `NumericBound`
+- `minMessage`
 - `max` as a `NumericBound`
+- `maxMessage`
 - `sizeMin`
+- `sizeMinMessage`
 - `sizeMax`
+- `sizeMaxMessage`
 - `patterns`
 - `extensionRules` (`jsonPath` + `regex`)
 
@@ -302,9 +315,13 @@ That is logically redundant but harmless.
 
 ```java
 if (effectiveConstraints.min() != null) {
-	propertyContext.constraint(new DecimalMinDef()
+	DecimalMinDef minDef = new DecimalMinDef()
 		.value(effectiveConstraints.min().value().toPlainString())
-		.inclusive(effectiveConstraints.min().inclusive()));
+		.inclusive(effectiveConstraints.min().inclusive());
+	if (effectiveConstraints.minMessage() != null) {
+		minDef.message(effectiveConstraints.minMessage());
+	}
+	propertyContext.constraint(minDef);
 }
 ```
 
@@ -320,9 +337,13 @@ Example:
 
 ```java
 if (effectiveConstraints.max() != null) {
-	propertyContext.constraint(new DecimalMaxDef()
+	DecimalMaxDef maxDef = new DecimalMaxDef()
 		.value(effectiveConstraints.max().value().toPlainString())
-		.inclusive(effectiveConstraints.max().inclusive()));
+		.inclusive(effectiveConstraints.max().inclusive());
+	if (effectiveConstraints.maxMessage() != null) {
+		maxDef.message(effectiveConstraints.maxMessage());
+	}
+	propertyContext.constraint(maxDef);
 }
 ```
 
@@ -338,20 +359,15 @@ Example:
 
 ```java
 if (effectiveConstraints.sizeMin() != null || effectiveConstraints.sizeMax() != null) {
-	SizeDef sizeDef = new SizeDef();
-	if (effectiveConstraints.sizeMin() != null) {
-		sizeDef.min(effectiveConstraints.sizeMin());
-	}
-	if (effectiveConstraints.sizeMax() != null) {
-		sizeDef.max(effectiveConstraints.sizeMax());
-	}
-	propertyContext.constraint(sizeDef);
+	boolean splitByMessage = effectiveConstraints.sizeMin() != null
+		&& effectiveConstraints.sizeMax() != null
+		&& !Objects.equals(effectiveConstraints.sizeMinMessage(), effectiveConstraints.sizeMaxMessage());
+	// if min/max messages differ, emit two SizeDef constraints
 }
 ```
 
-This creates one `SizeDef` object and sets the available sides.
-
-That matches how `@Size` works: one constraint with two optional parameters.
+When both bounds exist and messages are equal (or both null), one `SizeDef` is used.
+When both bounds exist and messages differ, the contributor emits separate min-only and max-only `SizeDef` constraints so each side can have its own message.
 
 Supported shapes:
 
@@ -388,6 +404,7 @@ Each `PatternRule` contains:
 
 - `regex`
 - `flags`
+- `message` (optional)
 
 The contributor recreates that rule as a Hibernate Validator `PatternDef`.
 
@@ -626,7 +643,14 @@ The metadata layer (`GeneratedClassMetadataCache`) also enforces that:
 At the end, the method returns:
 
 ```java
-new EffectiveFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns, extensionRules)
+new EffectiveFieldConstraints(
+	notNull, notNullMessage,
+	notBlank, notBlankMessage,
+	min, minMessage,
+	max, maxMessage,
+	sizeMin, sizeMinMessage,
+	sizeMax, sizeMaxMessage,
+	patterns, extensionRules)
 ```
 
 This object is the single source of truth for that field.

@@ -6,31 +6,45 @@ com.ampp:
           constraints:
             not-null:
               value: true
+              message: Name is required
             not-blank:
               value: true
+              message: Name must not be blank
             size:
               min:
                 value: 20
+                message: Name must have at least 20 characters
               max:
                 value: 30
+                message: Name must have at most 30 characters
+            pattern:
+              regexes:
+                - "^[A-Za-z ]+$"
+              message: Name may contain letters and spaces only
         - field-name: age
           constraints:
             not-null:
               value: true
+              message: Age is required
             min:
               value: 20
+              message: Age must be at least 20
             max:
               value: 60
+              message: Age must be at most 60
         - field-name: salary
           constraints:
             decimal-min:
               value: 1000.1
               inclusive: false
+              message: Salary must be greater than 1000.10
             decimal-max:
               value: 250000.00
+              message: Salary must be at most 250000.00
         - field-name: extensions
           constraints:
             extensions:
               rules:
                 - json-path: $.vendorExtensionCode
                   regex: "^[A-Z]{3}-[0-9]{4}$"
+                  message: Vendor extension code format is invalid

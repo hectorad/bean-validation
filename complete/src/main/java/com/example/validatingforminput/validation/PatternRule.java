@@ -5,7 +5,11 @@ import java.util.Set;
 
 import jakarta.validation.constraints.Pattern;
 
-public record PatternRule(String regex, Set<Pattern.Flag> flags) {
+public record PatternRule(String regex, Set<Pattern.Flag> flags, String message) {
+
+	public PatternRule(String regex, Set<Pattern.Flag> flags) {
+		this(regex, flags, null);
+	}
 
 	public PatternRule {
 		if (flags == null || flags.isEmpty()) {

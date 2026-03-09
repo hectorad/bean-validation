@@ -185,6 +185,8 @@ public class ValidationProperties {
 
         private Boolean hardValue;
 
+        private String message;
+
         public Boolean getValue() {
             return value;
         }
@@ -200,6 +202,14 @@ public class ValidationProperties {
         public void setHardValue(Boolean hardValue) {
             this.hardValue = hardValue;
         }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
+        }
     }
 
     public static class NumericConstraint {
@@ -207,6 +217,8 @@ public class ValidationProperties {
         private Long value;
 
         private Long hardValue;
+
+        private String message;
 
         public Long getValue() {
             return value;
@@ -223,6 +235,14 @@ public class ValidationProperties {
         public void setHardValue(Long hardValue) {
             this.hardValue = hardValue;
         }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
+        }
     }
 
     public static class DecimalConstraint {
@@ -234,6 +254,8 @@ public class ValidationProperties {
         private Boolean inclusive;
 
         private Boolean hardInclusive;
+
+        private String message;
 
         public BigDecimal getValue() {
             return value;
@@ -266,6 +288,14 @@ public class ValidationProperties {
         public void setHardInclusive(Boolean hardInclusive) {
             this.hardInclusive = hardInclusive;
         }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
+        }
     }
 
     public static class SizeConstraint {
@@ -297,12 +327,22 @@ public class ValidationProperties {
 
         private List<@NotBlank String> regexes = new ArrayList<>();
 
+        private String message;
+
         public List<String> getRegexes() {
             return regexes;
         }
 
         public void setRegexes(List<String> regexes) {
             this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
         }
     }
 
@@ -328,6 +368,8 @@ public class ValidationProperties {
         @NotBlank
         private String regex;
 
+        private String message;
+
         public String getJsonPath() {
             return jsonPath;
         }
@@ -342,6 +384,14 @@ public class ValidationProperties {
 
         public void setRegex(String regex) {
             this.regex = trimToNull(regex);
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
         }
     }
 

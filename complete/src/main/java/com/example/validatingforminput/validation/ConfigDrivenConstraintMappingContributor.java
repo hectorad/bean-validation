@@ -2,6 +2,7 @@ package com.example.validatingforminput.validation;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 import org.hibernate.validator.cfg.ConstraintMapping;
 import org.hibernate.validator.cfg.GenericConstraintDef;
@@ -72,42 +73,88 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 		PropertyConstraintMappingContext propertyContext = typeContext.field(fieldName).ignoreAnnotations(true);
 
 		if (effectiveConstraints.notNull()) {
-			propertyContext.constraint(new NotNullDef());
+			NotNullDef notNullDef = new NotNullDef();
+			if (effectiveConstraints.notNullMessage() != null) {
+				notNullDef.message(effectiveConstraints.notNullMessage());
+			}
+			propertyContext.constraint(notNullDef);
 		}
 		if (effectiveConstraints.notBlank()) {
-			propertyContext.constraint(new NotBlankDef());
+			NotBlankDef notBlankDef = new NotBlankDef();
+			if (effectiveConstraints.notBlankMessage() != null) {
+				notBlankDef.message(effectiveConstraints.notBlankMessage());
+			}
+			propertyContext.constraint(notBlankDef);
 		}
 		if (effectiveConstraints.min() != null) {
-			propertyContext.constraint(new DecimalMinDef()
+			DecimalMinDef minDef = new DecimalMinDef()
 				.value(effectiveConstraints.min().value().toPlainString())
-				.inclusive(effectiveConstraints.min().inclusive()));
+				.inclusive(effectiveConstraints.min().inclusive());
+			if (effectiveConstraints.minMessage() != null) {
+				minDef.message(effectiveConstraints.minMessage());
+			}
+			propertyContext.constraint(minDef);
 		}
 		if (effectiveConstraints.max() != null) {
-			propertyContext.constraint(new DecimalMaxDef()
+			DecimalMaxDef maxDef = new DecimalMaxDef()
 				.value(effectiveConstraints.max().value().toPlainString())
-				.inclusive(effectiveConstraints.max().inclusive()));
+				.inclusive(effectiveConstraints.max().inclusive());
+			if (effectiveConstraints.maxMessage() != null) {
+				maxDef.message(effectiveConstraints.maxMessage());
+			}
+			propertyContext.constraint(maxDef);
 		}
 		if (effectiveConstraints.sizeMin() != null || effectiveConstraints.sizeMax() != null) {
-			SizeDef sizeDef = new SizeDef();
-			if (effectiveConstraints.sizeMin() != null) {
-				sizeDef.min(effectiveConstraints.sizeMin());
+			boolean splitByMessage = effectiveConstraints.sizeMin() != null
+				&& effectiveConstraints.sizeMax() != null
+				&& !Objects.equals(effectiveConstraints.sizeMinMessage(), effectiveConstraints.sizeMaxMessage());
+			if (splitByMessage) {
+				SizeDef minSizeDef = new SizeDef().min(effectiveConstraints.sizeMin());
+				if (effectiveConstraints.sizeMinMessage() != null) {
+					minSizeDef.message(effectiveConstraints.sizeMinMessage());
+				}
+				propertyContext.constraint(minSizeDef);
+
+				SizeDef maxSizeDef = new SizeDef().max(effectiveConstraints.sizeMax());
+				if (effectiveConstraints.sizeMaxMessage() != null) {
+					maxSizeDef.message(effectiveConstraints.sizeMaxMessage());
+				}
+				propertyContext.constraint(maxSizeDef);
 			}
-			if (effectiveConstraints.sizeMax() != null) {
-				sizeDef.max(effectiveConstraints.sizeMax());
+			else {
+				SizeDef sizeDef = new SizeDef();
+				if (effectiveConstraints.sizeMin() != null) {
+					sizeDef.min(effectiveConstraints.sizeMin());
+				}
+				if (effectiveConstraints.sizeMax() != null) {
+					sizeDef.max(effectiveConstraints.sizeMax());
+				}
+				String mergedSizeMessage =
+					(effectiveConstraints.sizeMin() != null) ? effectiveConstraints.sizeMinMessage() : effectiveConstraints.sizeMaxMessage();
+				if (mergedSizeMessage != null) {
+					sizeDef.message(mergedSizeMessage);
+				}
+				propertyContext.constraint(sizeDef);
 			}
-			propertyContext.constraint(sizeDef);
 		}
 		for (PatternRule patternRule : effectiveConstraints.patterns()) {
 			PatternDef patternDef = new PatternDef().regexp(patternRule.regex());
 			if (!patternRule.flags().isEmpty()) {
 				patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
 			}
+			if (patternRule.message() != null) {
+				patternDef.message(patternRule.message());
+			}
 			propertyContext.constraint(patternDef);
 		}
 		for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
-			propertyContext.constraint(new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
+			GenericConstraintDef<ExtensionsJsonPathRegex> extensionDef = new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
 				.param("jsonPath", extensionRule.jsonPath())
-				.param("regex", extensionRule.regex()));
+				.param("regex", extensionRule.regex());
+			if (extensionRule.message() != null) {
+				extensionDef.message(extensionRule.message());
+			}
+			propertyContext.constraint(extensionDef);
 		}
 	}
 
