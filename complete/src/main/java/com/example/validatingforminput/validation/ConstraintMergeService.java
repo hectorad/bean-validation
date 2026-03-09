@@ -8,9 +8,6 @@ import java.util.regex.PatternSyntaxException;
 
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
-import org.springframework.stereotype.Component;
-
-@Component
 public class ConstraintMergeService {
 
 	public EffectiveFieldConstraints merge(

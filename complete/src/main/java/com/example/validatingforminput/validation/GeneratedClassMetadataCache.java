@@ -13,7 +13,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
 import jakarta.validation.constraints.DecimalMax;
@@ -25,7 +24,6 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
-@Component
 public class GeneratedClassMetadataCache {
 
 	private final Map<String, ResolvedClassMapping> resolvedClassMappingsByName;

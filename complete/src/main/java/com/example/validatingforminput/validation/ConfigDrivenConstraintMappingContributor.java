@@ -16,11 +16,9 @@ import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
-import org.springframework.stereotype.Component;
 
 import jakarta.validation.constraints.Pattern;
 
-@Component
 public class ConfigDrivenConstraintMappingContributor implements ConstraintMappingContributor {
 
 	private final ValidationProperties validationProperties;
