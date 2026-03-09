@@ -103,9 +103,9 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	private Map<String, ValidationProperties.ClassMapping> indexByClass(ValidationProperties properties) {
 		Map<String, ValidationProperties.ClassMapping> classIndex = new HashMap<>();
-		for (ValidationProperties.ClassMapping classMapping : properties.getMappings()) {
-			if (classMapping != null && classMapping.getClassName() != null) {
-				classIndex.put(classMapping.getClassName(), classMapping);
+		for (ValidationProperties.ClassMapping classMapping : properties.getBusinessValidationOverride()) {
+			if (classMapping != null && classMapping.getFullClassName() != null) {
+				classIndex.put(classMapping.getFullClassName(), classMapping);
 			}
 		}
 		return classIndex;

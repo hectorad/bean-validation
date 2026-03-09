@@ -1,6 +1,6 @@
-validation:
-  mappings:
-    - class-name: com.example.validatingforminput.PersonForm
+com.ampp:
+  business-validation-override:
+    - full-class-name: com.example.validatingforminput.PersonForm
       fields:
         - field-name: name
           constraints:

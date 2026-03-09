@@ -9,7 +9,7 @@ This document explains how the config-driven validation pipeline works in this p
 The goal of the pipeline is to take:
 
 1. validation annotations already present on the Java model
-2. extra constraints configured in `validation.*` properties
+2. extra constraints configured in `com.ampp.business-validation-override.*` properties
 
 and turn them into one final set of Hibernate Validator rules that the application uses at runtime.
 
@@ -49,9 +49,9 @@ Represents what came from `application.yml` or other Spring config sources.
 Examples:
 
 ```yaml
-validation:
+com.ampp.business-validation-override:
   mappings:
-    - class-name: com.example.validatingforminput.PersonForm
+    - full-class-name: com.example.validatingforminput.PersonForm
       fields:
         - field-name: name
           constraints:
@@ -572,9 +572,9 @@ private String name;
 And config adds:
 
 ```yaml
-validation:
+com.ampp.business-validation-override:
   mappings:
-    - class-name: com.example.validatingforminput.PersonForm
+    - full-class-name: com.example.validatingforminput.PersonForm
       fields:
         - field-name: name
           constraints:

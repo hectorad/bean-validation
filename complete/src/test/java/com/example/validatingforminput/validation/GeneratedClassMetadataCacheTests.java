@@ -14,8 +14,8 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenClassDoesNotExist() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName("com.example.missing.MissingPerson");
-		properties.setMappings(List.of(classMapping));
+		classMapping.setFullClassName("com.example.missing.MissingPerson");
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(IllegalStateException.class)
@@ -26,11 +26,11 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenConfiguredFieldDoesNotExist() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName(PersonForm.class.getName());
+		classMapping.setFullClassName(PersonForm.class.getName());
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("doesNotExist");
 		classMapping.setFields(List.of(fieldMapping));
-		properties.setMappings(List.of(classMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(IllegalStateException.class)
@@ -41,14 +41,14 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenNotBlankIsConfiguredForNonStringField() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName(PersonForm.class.getName());
+		classMapping.setFullClassName(PersonForm.class.getName());
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
 		fieldMapping.getConstraints().getNotBlank().setValue(true);
 
 		classMapping.setFields(List.of(fieldMapping));
-		properties.setMappings(List.of(classMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
@@ -59,14 +59,14 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenSizeIsConfiguredForUnsupportedFieldType() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName(PersonForm.class.getName());
+		classMapping.setFullClassName(PersonForm.class.getName());
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
 		fieldMapping.getConstraints().getSize().getMin().setValue(1L);
 
 		classMapping.setFields(List.of(fieldMapping));
-		properties.setMappings(List.of(classMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
@@ -77,14 +77,14 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenPatternIsConfiguredForNonStringField() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName(PersonForm.class.getName());
+		classMapping.setFullClassName(PersonForm.class.getName());
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
 		fieldMapping.getConstraints().getPattern().setRegexes(List.of("^\\d+$"));
 
 		classMapping.setFields(List.of(fieldMapping));
-		properties.setMappings(List.of(classMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
@@ -95,14 +95,14 @@ class GeneratedClassMetadataCacheTests {
 	void shouldFailWhenMinIsConfiguredForUnsupportedFieldType() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
-		classMapping.setClassName(UnsupportedConstraintTarget.class.getName());
+		classMapping.setFullClassName(UnsupportedConstraintTarget.class.getName());
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("active");
 		fieldMapping.getConstraints().getMin().setValue(1L);
 
 		classMapping.setFields(List.of(fieldMapping));
-		properties.setMappings(List.of(classMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)

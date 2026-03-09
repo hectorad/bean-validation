@@ -48,7 +48,7 @@ public class GeneratedClassMetadataCache {
 	private Map<String, ResolvedClassMapping> buildResolvedMappings(ValidationProperties validationProperties) {
 		Map<String, ResolvedClassMapping> mappingIndex = new LinkedHashMap<>();
 
-		for (ValidationProperties.ClassMapping classMapping : validationProperties.getMappings()) {
+		for (ValidationProperties.ClassMapping classMapping : validationProperties.getBusinessValidationOverride()) {
 			String className = normalizeClassName(classMapping);
 			if (mappingIndex.containsKey(className)) {
 				throw new IllegalStateException("Duplicate class mapping found in validation configuration: " + className);
@@ -76,10 +76,10 @@ public class GeneratedClassMetadataCache {
 	}
 
 	private String normalizeClassName(ValidationProperties.ClassMapping classMapping) {
-		if (classMapping == null || !StringUtils.hasText(classMapping.getClassName())) {
-			throw new IllegalStateException("Each validation class mapping must define a non-empty className.");
+		if (classMapping == null || !StringUtils.hasText(classMapping.getFullClassName())) {
+			throw new IllegalStateException("Each validation class mapping must define a non-empty fullClassName.");
 		}
-		return classMapping.getClassName().trim();
+		return classMapping.getFullClassName().trim();
 	}
 
 	private String normalizeFieldName(String className, ValidationProperties.FieldMapping fieldMapping) {

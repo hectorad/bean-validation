@@ -16,18 +16,18 @@ import jakarta.validation.ConstraintViolationException;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
-	"validation.mappings[0].class-name=com.example.validatingforminput.PersonForm",
-	"validation.mappings[0].fields[0].field-name=name",
-	"validation.mappings[0].fields[0].constraints.not-null.value=true",
-	"validation.mappings[0].fields[0].constraints.not-blank.value=true",
-	"validation.mappings[0].fields[0].constraints.size.min.value=4",
-	"validation.mappings[0].fields[0].constraints.size.max.value=40",
-	"validation.mappings[0].fields[0].constraints.pattern.regexes[0]=^[A-Za-z]+$",
-	"validation.mappings[0].fields[1].field-name=age",
-	"validation.mappings[0].fields[1].constraints.not-null.value=true",
-	"validation.mappings[0].fields[1].constraints.min.value=25",
-	"validation.mappings[0].fields[1].constraints.min.hard-value=22",
-	"validation.mappings[0].fields[1].constraints.max.value=70"
+	"com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm",
+	"com.ampp.business-validation-override[0].fields[0].field-name=name",
+	"com.ampp.business-validation-override[0].fields[0].constraints.not-null.value=true",
+	"com.ampp.business-validation-override[0].fields[0].constraints.not-blank.value=true",
+	"com.ampp.business-validation-override[0].fields[0].constraints.size.min.value=4",
+	"com.ampp.business-validation-override[0].fields[0].constraints.size.max.value=40",
+	"com.ampp.business-validation-override[0].fields[0].constraints.pattern.regexes[0]=^[A-Za-z]+$",
+	"com.ampp.business-validation-override[0].fields[1].field-name=age",
+	"com.ampp.business-validation-override[0].fields[1].constraints.not-null.value=true",
+	"com.ampp.business-validation-override[0].fields[1].constraints.min.value=25",
+	"com.ampp.business-validation-override[0].fields[1].constraints.min.hard-value=22",
+	"com.ampp.business-validation-override[0].fields[1].constraints.max.value=70"
 })
 @AutoConfigureMockMvc
 public class ApplicationMockMvcTests {

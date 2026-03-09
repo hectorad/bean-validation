@@ -11,35 +11,35 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Validated
-@ConfigurationProperties(prefix = "validation")
+@ConfigurationProperties(prefix = "com.ampp")
 public class ValidationProperties {
 
     @Valid
-    private List<@NotNull @Valid ClassMapping> mappings = new ArrayList<>();
+    private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
 
-    public List<ClassMapping> getMappings() {
-        return mappings;
+    public List<ClassMapping> getBusinessValidationOverride() {
+        return businessValidationOverride;
     }
 
-    public void setMappings(List<ClassMapping> mappings) {
-        this.mappings = (mappings == null) ? new ArrayList<>() : mappings;
+    public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
+        this.businessValidationOverride = (businessValidationOverride == null) ? new ArrayList<>() : businessValidationOverride;
     }
 
     public static class ClassMapping {
 
         @NotBlank
-        private String className;
+        private String fullClassName;
 
         @NotEmpty
         @Valid
         private List<@NotNull @Valid FieldMapping> fields = new ArrayList<>();
 
-        public String getClassName() {
-            return className;
+        public String getFullClassName() {
+            return fullClassName;
         }
 
-        public void setClassName(String className) {
-            this.className = trimToNull(className);
+        public void setFullClassName(String fullClassName) {
+            this.fullClassName = trimToNull(fullClassName);
         }
 
         public List<FieldMapping> getFields() {
