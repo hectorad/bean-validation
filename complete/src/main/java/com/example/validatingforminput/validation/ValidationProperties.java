@@ -327,6 +327,8 @@ public class ValidationProperties {
 
         private List<@NotBlank String> regexes = new ArrayList<>();
 
+        private List<String> flags = new ArrayList<>();
+
         private String message;
 
         public List<String> getRegexes() {
@@ -335,6 +337,14 @@ public class ValidationProperties {
 
         public void setRegexes(List<String> regexes) {
             this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
+        }
+
+        public List<String> getFlags() {
+            return flags;
+        }
+
+        public void setFlags(List<String> flags) {
+            this.flags = (flags == null) ? new ArrayList<>() : flags;
         }
 
         public String getMessage() {

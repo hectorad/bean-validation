@@ -209,6 +209,47 @@ class GeneratedClassMetadataCacheTests {
 			.hasMessageContaining("Invalid DecimalMin annotation");
 	}
 
+	@Test
+	void shouldFailWhenDuplicateClassMappingExists() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping1 = new ValidationProperties.ClassMapping();
+		classMapping1.setFullClassName(PersonForm.class.getName());
+		ValidationProperties.FieldMapping fieldMapping1 = new ValidationProperties.FieldMapping();
+		fieldMapping1.setFieldName("name");
+		classMapping1.setFields(List.of(fieldMapping1));
+
+		ValidationProperties.ClassMapping classMapping2 = new ValidationProperties.ClassMapping();
+		classMapping2.setFullClassName(PersonForm.class.getName());
+		ValidationProperties.FieldMapping fieldMapping2 = new ValidationProperties.FieldMapping();
+		fieldMapping2.setFieldName("age");
+		classMapping2.setFields(List.of(fieldMapping2));
+
+		properties.setBusinessValidationOverride(List.of(classMapping1, classMapping2));
+
+		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("Duplicate class mapping");
+	}
+
+	@Test
+	void shouldFailWhenDuplicateFieldMappingExists() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(PersonForm.class.getName());
+
+		ValidationProperties.FieldMapping fieldMapping1 = new ValidationProperties.FieldMapping();
+		fieldMapping1.setFieldName("name");
+		ValidationProperties.FieldMapping fieldMapping2 = new ValidationProperties.FieldMapping();
+		fieldMapping2.setFieldName("name");
+
+		classMapping.setFields(List.of(fieldMapping1, fieldMapping2));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
+			.isInstanceOf(IllegalStateException.class)
+			.hasMessageContaining("Duplicate field mapping");
+	}
+
 	private static final class UnsupportedConstraintTarget {
 
 		@SuppressWarnings("unused")

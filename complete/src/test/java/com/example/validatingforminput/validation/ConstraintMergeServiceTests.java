@@ -308,9 +308,9 @@ class ConstraintMergeServiceTests {
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "extensions");
 
 		assertThat(effective.extensionRules()).hasSize(1);
-		assertThat(effective.extensionRules().get(0).jsonPath()).isEqualTo("$.partner.code");
-		assertThat(effective.extensionRules().get(0).regex()).isEqualTo("^[A-Z]{2}-\\d{3}$");
-		assertThat(effective.extensionRules().get(0).message()).isNull();
+		assertThat(effective.extensionRules().getFirst().jsonPath()).isEqualTo("$.partner.code");
+		assertThat(effective.extensionRules().getFirst().regex()).isEqualTo("^[A-Z]{2}-\\d{3}$");
+		assertThat(effective.extensionRules().getFirst().message()).isNull();
 	}
 
 	@Test
@@ -326,7 +326,7 @@ class ConstraintMergeServiceTests {
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "extensions");
 
 		assertThat(effective.extensionRules()).hasSize(1);
-		assertThat(effective.extensionRules().get(0).message()).isEqualTo("Invalid partner code");
+		assertThat(effective.extensionRules().getFirst().message()).isEqualTo("Invalid partner code");
 	}
 
 	@Test
@@ -355,6 +355,34 @@ class ConstraintMergeServiceTests {
 		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "extensions"))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
 			.hasMessageContaining("regex could not be compiled");
+	}
+
+	@Test
+	void shouldApplyConfiguredPatternFlags() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of("^[a-z]+$"));
+		constraints.getPattern().setFlags(List.of("CASE_INSENSITIVE", "MULTILINE"));
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
+
+		assertThat(effective.patterns()).hasSize(1);
+		assertThat(effective.patterns().getFirst().regex()).isEqualTo("^[a-z]+$");
+		assertThat(effective.patterns().getFirst().flags()).containsExactlyInAnyOrder(
+			Pattern.Flag.CASE_INSENSITIVE, Pattern.Flag.MULTILINE);
+	}
+
+	@Test
+	void shouldFailWhenConfiguredPatternFlagIsInvalid() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of("^[a-z]+$"));
+		constraints.getPattern().setFlags(List.of("NOT_A_REAL_FLAG"));
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("Invalid pattern flag")
+			.hasMessageContaining("NOT_A_REAL_FLAG");
 	}
 
 	private void assertBound(NumericBound bound, String expectedValue, boolean expectedInclusive) {

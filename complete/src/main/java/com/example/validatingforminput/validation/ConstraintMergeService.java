@@ -2,7 +2,9 @@ package com.example.validatingforminput.validation;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -60,6 +62,7 @@ public class ConstraintMergeService {
 		appendConfiguredPatterns(
 			patterns,
 			effectiveConfig.getPattern().getRegexes(),
+			effectiveConfig.getPattern().getFlags(),
 			effectiveConfig.getPattern().getMessage(),
 			className,
 			fieldName);
@@ -331,17 +334,21 @@ public class ConstraintMergeService {
 	private void appendConfiguredPatterns(
 		List<PatternRule> patterns,
 		List<String> configuredRegexes,
+		List<String> configuredFlags,
 		String configuredMessage,
 		String className,
 		String fieldName
 	) {
+		Set<jakarta.validation.constraints.Pattern.Flag> parsedFlags =
+			parsePatternFlags(configuredFlags, className, fieldName);
 		for (int index = 0; index < configuredRegexes.size(); index++) {
-			patterns.add(toConfiguredPatternRule(configuredRegexes.get(index), configuredMessage, className, fieldName, index));
+			patterns.add(toConfiguredPatternRule(configuredRegexes.get(index), parsedFlags, configuredMessage, className, fieldName, index));
 		}
 	}
 
 	private PatternRule toConfiguredPatternRule(
 		String regex,
+		Set<jakarta.validation.constraints.Pattern.Flag> flags,
 		String configuredMessage,
 		String className,
 		String fieldName,
@@ -349,7 +356,32 @@ public class ConstraintMergeService {
 	) {
 		String requiredRegex = requireNonEmpty("pattern", "regex", regex, className, fieldName, index);
 		validateRegex("pattern", requiredRegex, className, fieldName, index);
-		return new PatternRule(requiredRegex, null, configuredMessage);
+		return new PatternRule(requiredRegex, flags, configuredMessage);
+	}
+
+	private Set<jakarta.validation.constraints.Pattern.Flag> parsePatternFlags(
+		List<String> flagNames,
+		String className,
+		String fieldName
+	) {
+		if (flagNames == null || flagNames.isEmpty()) {
+			return EnumSet.noneOf(jakarta.validation.constraints.Pattern.Flag.class);
+		}
+		Set<jakarta.validation.constraints.Pattern.Flag> flags =
+			EnumSet.noneOf(jakarta.validation.constraints.Pattern.Flag.class);
+		for (String flagName : flagNames) {
+			try {
+				flags.add(jakarta.validation.constraints.Pattern.Flag.valueOf(flagName));
+			}
+			catch (IllegalArgumentException exception) {
+				throw new InvalidConstraintConfigurationException(
+					"Invalid pattern flag '" + flagName + "' for class=" + className
+						+ ", field=" + fieldName + ". Valid flags: "
+						+ java.util.Arrays.toString(jakarta.validation.constraints.Pattern.Flag.values()),
+					exception);
+			}
+		}
+		return flags;
 	}
 
 	private SizeBoundCandidate toSizeBound(
