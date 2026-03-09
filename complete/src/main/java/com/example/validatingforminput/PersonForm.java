@@ -2,6 +2,7 @@ package com.example.validatingforminput;
 
 
 import java.math.BigDecimal;
+import java.util.Map;
 
 import jakarta.validation.constraints.*;
 
@@ -21,6 +22,8 @@ public class PersonForm {
 	@DecimalMin(value = "1000.00", inclusive = false)
 	@DecimalMax("250000.00")
 	private BigDecimal salary;
+
+	private Map<String, Object> extensions;
 
 	public String getName() {
 		return this.name;
@@ -46,7 +49,15 @@ public class PersonForm {
 		this.salary = salary;
 	}
 
+	public Map<String, Object> getExtensions() {
+		return extensions;
+	}
+
+	public void setExtensions(Map<String, Object> extensions) {
+		this.extensions = extensions;
+	}
+
 	public String toString() {
-		return "Person(Name: " + this.name + ", Age: " + this.age + ", Salary: " + this.salary + ")";
+		return "Person(Name: " + this.name + ", Age: " + this.age + ", Salary: " + this.salary + ", Extensions: " + this.extensions + ")";
 	}
 }

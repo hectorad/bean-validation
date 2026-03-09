@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.hibernate.validator.cfg.ConstraintMapping;
+import org.hibernate.validator.cfg.GenericConstraintDef;
 import org.hibernate.validator.cfg.context.PropertyConstraintMappingContext;
 import org.hibernate.validator.cfg.context.TypeConstraintMappingContext;
 import org.hibernate.validator.cfg.defs.DecimalMaxDef;
@@ -102,6 +103,11 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
 			}
 			propertyContext.constraint(patternDef);
+		}
+		for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
+			propertyContext.constraint(new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
+				.param("jsonPath", extensionRule.jsonPath())
+				.param("regex", extensionRule.regex()));
 		}
 	}
 

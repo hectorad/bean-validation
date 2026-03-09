@@ -103,6 +103,9 @@ public class ValidationProperties {
         @Valid
         private PatternConstraint pattern = new PatternConstraint();
 
+        @Valid
+        private ExtensionsConstraint extensions = new ExtensionsConstraint();
+
         public ToggleConstraint getNotNull() {
             return notNull;
         }
@@ -167,6 +170,14 @@ public class ValidationProperties {
             this.pattern = (pattern == null) ? new PatternConstraint() : pattern;
         }
 
+        public ExtensionsConstraint getExtensions() {
+            return extensions;
+        }
+
+        public void setExtensions(ExtensionsConstraint extensions) {
+            this.extensions = (extensions == null) ? new ExtensionsConstraint() : extensions;
+        }
+
         boolean hasConfiguredValues() {
             return isEnabled(notNull)
                     || isEnabled(notBlank)
@@ -176,7 +187,8 @@ public class ValidationProperties {
                     || hasDecimalValue(decimalMax)
                     || hasNumericValue(size.getMin())
                     || hasNumericValue(size.getMax())
-                    || !pattern.getRegexes().isEmpty();
+                    || !pattern.getRegexes().isEmpty()
+                    || !extensions.getRules().isEmpty();
         }
 
         private boolean isEnabled(ToggleConstraint constraint) {
@@ -319,6 +331,45 @@ public class ValidationProperties {
 
         public void setRegexes(List<String> regexes) {
             this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
+        }
+    }
+
+    public static class ExtensionsConstraint {
+
+        @Valid
+        private List<@NotNull @Valid ExtensionRuleConstraint> rules = new ArrayList<>();
+
+        public List<ExtensionRuleConstraint> getRules() {
+            return rules;
+        }
+
+        public void setRules(List<ExtensionRuleConstraint> rules) {
+            this.rules = (rules == null) ? new ArrayList<>() : rules;
+        }
+    }
+
+    public static class ExtensionRuleConstraint {
+
+        @NotBlank
+        private String jsonPath;
+
+        @NotBlank
+        private String regex;
+
+        public String getJsonPath() {
+            return jsonPath;
+        }
+
+        public void setJsonPath(String jsonPath) {
+            this.jsonPath = trimToNull(jsonPath);
+        }
+
+        public String getRegex() {
+            return regex;
+        }
+
+        public void setRegex(String regex) {
+            this.regex = trimToNull(regex);
         }
     }
 

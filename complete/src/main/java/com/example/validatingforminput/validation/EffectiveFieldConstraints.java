@@ -9,10 +9,12 @@ public record EffectiveFieldConstraints(
 	NumericBound max,
 	Integer sizeMin,
 	Integer sizeMax,
-	List<PatternRule> patterns
+	List<PatternRule> patterns,
+	List<ExtensionRegexRule> extensionRules
 ) {
 
 	public EffectiveFieldConstraints {
 		patterns = (patterns == null) ? List.of() : List.copyOf(patterns);
+		extensionRules = (extensionRules == null) ? List.of() : List.copyOf(extensionRules);
 	}
 }

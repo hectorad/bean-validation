@@ -184,6 +184,50 @@ class ConstraintMergeServiceTests {
 			.hasMessageContaining("exceeds Integer.MAX_VALUE");
 	}
 
+	@Test
+	void shouldAddConfiguredExtensionsRules() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		ValidationProperties.ExtensionRuleConstraint rule = new ValidationProperties.ExtensionRuleConstraint();
+		rule.setJsonPath("$.partner.code");
+		rule.setRegex("^[A-Z]{2}-\\d{3}$");
+		constraints.getExtensions().setRules(List.of(rule));
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "extensions");
+
+		assertThat(effective.extensionRules()).hasSize(1);
+		assertThat(effective.extensionRules().get(0).jsonPath()).isEqualTo("$.partner.code");
+		assertThat(effective.extensionRules().get(0).regex()).isEqualTo("^[A-Z]{2}-\\d{3}$");
+	}
+
+	@Test
+	void shouldFailWhenConfiguredExtensionsJsonPathIsInvalid() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		ValidationProperties.ExtensionRuleConstraint rule = new ValidationProperties.ExtensionRuleConstraint();
+		rule.setJsonPath("$..[");
+		rule.setRegex("^[A-Z]+$");
+		constraints.getExtensions().setRules(List.of(rule));
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "extensions"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("jsonPath could not be compiled");
+	}
+
+	@Test
+	void shouldFailWhenConfiguredExtensionsRegexIsInvalid() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		ValidationProperties.ExtensionRuleConstraint rule = new ValidationProperties.ExtensionRuleConstraint();
+		rule.setJsonPath("$.partner.code");
+		rule.setRegex("[");
+		constraints.getExtensions().setRules(List.of(rule));
+
+		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "extensions"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("regex could not be compiled");
+	}
+
 	private void assertBound(NumericBound bound, String expectedValue, boolean expectedInclusive) {
 		assertThat(bound).isNotNull();
 		assertThat(bound.value()).isEqualByComparingTo(new BigDecimal(expectedValue));

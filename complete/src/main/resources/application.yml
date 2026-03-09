@@ -28,3 +28,9 @@ com.ampp:
               inclusive: false
             decimal-max:
               value: 250000.00
+        - field-name: extensions
+          constraints:
+            extensions:
+              rules:
+                - json-path: $.vendorExtensionCode
+                  regex: "^[A-Z]{3}-[0-9]{4}$"

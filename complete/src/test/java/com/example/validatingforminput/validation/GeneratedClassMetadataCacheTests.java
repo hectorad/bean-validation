@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.util.Map;
 
 import org.junit.jupiter.api.Test;
 
@@ -95,6 +96,48 @@ class GeneratedClassMetadataCacheTests {
 	}
 
 	@Test
+	void shouldFailWhenExtensionsRuleIsConfiguredForUnsupportedFieldType() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(UnsupportedExtensionsFieldTypeTarget.class.getName());
+
+		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
+		fieldMapping.setFieldName("extensions");
+		ValidationProperties.ExtensionRuleConstraint extensionRule = new ValidationProperties.ExtensionRuleConstraint();
+		extensionRule.setJsonPath("$.partner.code");
+		extensionRule.setRegex("^[A-Z]+$");
+		fieldMapping.getConstraints().getExtensions().setRules(List.of(extensionRule));
+
+		classMapping.setFields(List.of(fieldMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("Constraint extensions is not supported");
+	}
+
+	@Test
+	void shouldFailWhenExtensionsRuleIsConfiguredForFieldOtherThanExtensions() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(NonExtensionsMapTarget.class.getName());
+
+		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
+		fieldMapping.setFieldName("metadata");
+		ValidationProperties.ExtensionRuleConstraint extensionRule = new ValidationProperties.ExtensionRuleConstraint();
+		extensionRule.setJsonPath("$.partner.code");
+		extensionRule.setRegex("^[A-Z]+$");
+		fieldMapping.getConstraints().getExtensions().setRules(List.of(extensionRule));
+
+		classMapping.setFields(List.of(fieldMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("field=extensions");
+	}
+
+	@Test
 	void shouldFailWhenMinIsConfiguredForUnsupportedFieldType() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
@@ -170,6 +213,18 @@ class GeneratedClassMetadataCacheTests {
 
 		@SuppressWarnings("unused")
 		private Boolean active;
+	}
+
+	private static final class NonExtensionsMapTarget {
+
+		@SuppressWarnings("unused")
+		private Map<String, Object> metadata;
+	}
+
+	private static final class UnsupportedExtensionsFieldTypeTarget {
+
+		@SuppressWarnings("unused")
+		private Integer extensions;
 	}
 
 	private static final class UnsupportedDecimalConstraintTarget {

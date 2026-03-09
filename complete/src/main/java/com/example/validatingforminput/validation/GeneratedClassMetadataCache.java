@@ -152,6 +152,14 @@ public class GeneratedClassMetadataCache {
 		if (hasConfiguredPatterns(constraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("pattern", className, fieldName, fieldType);
 		}
+		if (hasConfiguredExtensions(constraints) && !"extensions".equals(fieldName)) {
+			throw new InvalidConstraintConfigurationException(
+				"Constraint extensions can only be configured for class="
+					+ className + ", field=extensions");
+		}
+		if (hasConfiguredExtensions(constraints) && !supportsExtensions(field.getType())) {
+			throw unsupportedConstraint("extensions", className, fieldName, field.getType());
+		}
 	}
 
 	private void collectAnnotationBaseline(
@@ -292,6 +300,10 @@ public class GeneratedClassMetadataCache {
 		return !constraints.getPattern().getRegexes().isEmpty();
 	}
 
+	private boolean hasConfiguredExtensions(ValidationProperties.Constraints constraints) {
+		return !constraints.getExtensions().getRules().isEmpty();
+	}
+
 	private boolean supportsCharSequence(Class<?> fieldType) {
 		return CharSequence.class.isAssignableFrom(fieldType);
 	}
@@ -307,6 +319,13 @@ public class GeneratedClassMetadataCache {
 	}
 
 	private boolean supportsSize(Class<?> fieldType) {
+		return fieldType.isArray()
+			|| CharSequence.class.isAssignableFrom(fieldType)
+			|| java.util.Collection.class.isAssignableFrom(fieldType)
+			|| java.util.Map.class.isAssignableFrom(fieldType);
+	}
+
+	private boolean supportsExtensions(Class<?> fieldType) {
 		return fieldType.isArray()
 			|| CharSequence.class.isAssignableFrom(fieldType)
 			|| java.util.Collection.class.isAssignableFrom(fieldType)

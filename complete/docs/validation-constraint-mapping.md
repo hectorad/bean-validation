@@ -19,9 +19,10 @@ The flow is:
 
 1. `GeneratedClassMetadataCache` resolves configured classes and fields.
 2. It extracts baseline constraints from field and getter annotations.
-3. `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)` iterates over every resolved class and field.
-4. For each field, `ConstraintMergeService.merge(...)` combines baseline constraints and configured constraints into one `EffectiveFieldConstraints` object.
-5. `applyConstraints(...)` translates that `EffectiveFieldConstraints` object into Hibernate Validator programmatic mappings.
+3. It validates configuration support for each field type (for example, `constraints.extensions` can only target a field named `extensions`).
+4. `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)` iterates over every resolved class and field.
+5. For each field, `ConstraintMergeService.merge(...)` combines baseline constraints and configured constraints into one `EffectiveFieldConstraints` object.
+6. `applyConstraints(...)` translates that `EffectiveFieldConstraints` object into Hibernate Validator programmatic mappings.
 
 That means the policy decisions happen before `applyConstraints(...)`.
 
@@ -76,6 +77,12 @@ com:
               decimal-max:
                 value: 58.5
                 inclusive: false
+          - field-name: extensions
+            constraints:
+              extensions:
+                rules:
+                  - json-path: $.vendorExtensionCode
+                    regex: ^[A-Z]{3}-[0-9]{4}$
 ```
 
 ### `EffectiveFieldConstraints`
@@ -91,6 +98,7 @@ It contains:
 - `sizeMin`
 - `sizeMax`
 - `patterns`
+- `extensionRules` (`jsonPath` + `regex`)
 
 If `EffectiveFieldConstraints` says `min = NumericBound(25.5, false)`, then the contributor will add a programmatic `@DecimalMin(value = "25.5", inclusive = false)`.
 
@@ -405,6 +413,28 @@ Result: validation fails.
 
 That is why configured patterns act as a hardening mechanism in this project.
 
+### Step 8: apply configured `extensions` JSONPath rules
+
+```java
+for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
+	propertyContext.constraint(new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
+		.param("jsonPath", extensionRule.jsonPath())
+		.param("regex", extensionRule.regex()));
+}
+```
+
+`extensions` rules are implemented with a custom Bean Validation constraint because Hibernate Validator has no built-in annotation for:
+
+- read a JSON value by JSONPath
+- then validate that value with a regex
+
+Runtime behavior of this validator:
+
+- evaluate the configured `jsonPath` against the `extensions` field value
+- apply `regex` to each resolved scalar value
+- if the path is missing, treat it as "condition not met" and skip validation
+- if a resolved value exists and does not match, raise a violation
+
 ## `ConstraintMergeService.merge(...)`
 
 Source: `ConstraintMergeService`
@@ -569,12 +599,30 @@ That means configured patterns make the field stricter by adding more rules.
 
 If either check fails, the method throws `InvalidConstraintConfigurationException`.
 
+### `extensions` rules are validated and merged
+
+```java
+List<ExtensionRegexRule> extensionRules = new ArrayList<>();
+appendConfiguredExtensions(extensionRules, effectiveConfig.getExtensions().getRules(), className, fieldName);
+```
+
+`appendConfiguredExtensions(...)` validates each configured rule:
+
+1. rule entry must be non-null
+2. `jsonPath` must be non-empty and compile successfully
+3. `regex` must be non-empty and compile successfully
+
+The metadata layer (`GeneratedClassMetadataCache`) also enforces that:
+
+- `constraints.extensions` can only be configured for field name `extensions`
+- the field type must support JSONPath evaluation (`Map`, `Collection`, array, or JSON `String`)
+
 ### Final result
 
 At the end, the method returns:
 
 ```java
-new EffectiveFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns)
+new EffectiveFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns, extensionRules)
 ```
 
 This object is the single source of truth for that field.
@@ -661,7 +709,9 @@ The contributor is not responsible for:
 - extracting annotations
 - determining stricter min/max
 - validating regex syntax
+- validating JSONPath syntax
 - validating impossible min/max combinations
+- enforcing that `constraints.extensions` is only configured on field `extensions`
 
 Those concerns are intentionally handled before or outside `applyConstraints(...)`.
 
