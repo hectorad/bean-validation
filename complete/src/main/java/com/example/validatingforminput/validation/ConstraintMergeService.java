@@ -3,6 +3,7 @@ package com.example.validatingforminput.validation;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.jayway.jsonpath.InvalidPathException;
@@ -83,8 +84,8 @@ public class ConstraintMergeService {
 
 		List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
 		appendConfiguredPatterns(patterns, effectiveConfig.getPattern().getRegexes(), className, fieldName);
-		List<ExtensionRegexRule> extensionRules = new ArrayList<>();
-		appendConfiguredExtensions(extensionRules, effectiveConfig.getExtensions().getRules(), className, fieldName);
+		List<ExtensionRegexRule> extensionRules =
+			toConfiguredExtensionRules(effectiveConfig.getExtensions().getRules(), className, fieldName);
 
 		return new EffectiveFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns, extensionRules);
 	}
@@ -194,27 +195,14 @@ public class ConstraintMergeService {
 		String fieldName
 	) {
 		for (int index = 0; index < configuredRegexes.size(); index++) {
-			String regex = configuredRegexes.get(index);
-			if (regex == null || regex.isEmpty()) {
-				throw new InvalidConstraintConfigurationException(
-					"Invalid pattern constraint. regex must be non-empty for class="
-						+ className + ", field=" + fieldName + ", index=" + index);
-			}
-			validateRegex(regex, className, fieldName, index);
-			patterns.add(new PatternRule(regex, null));
+			patterns.add(toConfiguredPatternRule(configuredRegexes.get(index), className, fieldName, index));
 		}
 	}
 
-	private void validateRegex(String regex, String className, String fieldName, int index) {
-		try {
-			java.util.regex.Pattern.compile(regex);
-		}
-		catch (PatternSyntaxException exception) {
-			throw new InvalidConstraintConfigurationException(
-				"Invalid pattern constraint. regex could not be compiled for class="
-					+ className + ", field=" + fieldName + ", index=" + index + ", regex=" + regex,
-				exception);
-		}
+	private PatternRule toConfiguredPatternRule(String regex, String className, String fieldName, int index) {
+		String requiredRegex = requireNonEmpty("pattern", "regex", regex, className, fieldName, index);
+		validateRegex("pattern", requiredRegex, className, fieldName, index);
+		return new PatternRule(requiredRegex, null);
 	}
 
 	private Integer toSizeInteger(Long value, String className, String fieldName, String propertyName) {
@@ -237,43 +225,76 @@ public class ConstraintMergeService {
 		}
 	}
 
-	private void appendConfiguredExtensions(
-		List<ExtensionRegexRule> extensionRules,
+	private List<ExtensionRegexRule> toConfiguredExtensionRules(
 		List<ValidationProperties.ExtensionRuleConstraint> configuredRules,
 		String className,
 		String fieldName
 	) {
-		if (configuredRules == null) {
-			return;
+		if (configuredRules == null || configuredRules.isEmpty()) {
+			return List.of();
 		}
+
+		List<ExtensionRegexRule> extensionRules = new ArrayList<>();
 		for (int index = 0; index < configuredRules.size(); index++) {
-			ValidationProperties.ExtensionRuleConstraint configuredRule = configuredRules.get(index);
-			if (configuredRule == null) {
-				throw new InvalidConstraintConfigurationException(
-					"Invalid extensions constraint. rule must be non-null for class="
-						+ className + ", field=" + fieldName + ", index=" + index);
-			}
+			extensionRules.add(toConfiguredExtensionRule(configuredRules.get(index), className, fieldName, index));
+		}
+		return extensionRules;
+	}
 
-			String jsonPath = configuredRule.getJsonPath();
-			String regex = configuredRule.getRegex();
-			if (jsonPath == null || jsonPath.isEmpty()) {
-				throw new InvalidConstraintConfigurationException(
-					"Invalid extensions constraint. jsonPath must be non-empty for class="
-						+ className + ", field=" + fieldName + ", index=" + index);
-			}
-			if (regex == null || regex.isEmpty()) {
-				throw new InvalidConstraintConfigurationException(
-					"Invalid extensions constraint. regex must be non-empty for class="
-						+ className + ", field=" + fieldName + ", index=" + index);
-			}
+	private ExtensionRegexRule toConfiguredExtensionRule(
+		ValidationProperties.ExtensionRuleConstraint configuredRule,
+		String className,
+		String fieldName,
+		int index
+	) {
+		if (configuredRule == null) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid extensions constraint. rule must be non-null for class="
+					+ className + ", field=" + fieldName + ", index=" + index);
+		}
 
-			validateExtensionJsonPath(jsonPath, className, fieldName, index);
-			validateExtensionRegex(regex, className, fieldName, index);
-			extensionRules.add(new ExtensionRegexRule(jsonPath, regex));
+		String jsonPath = requireNonEmpty("extensions", "jsonPath", configuredRule.getJsonPath(), className, fieldName, index);
+		validateJsonPath(jsonPath, className, fieldName, index);
+		String regex = requireNonEmpty("extensions", "regex", configuredRule.getRegex(), className, fieldName, index);
+		validateRegex("extensions", regex, className, fieldName, index);
+		return new ExtensionRegexRule(jsonPath, regex);
+	}
+
+	private String requireNonEmpty(
+		String constraintName,
+		String propertyName,
+		String value,
+		String className,
+		String fieldName,
+		int index
+	) {
+		if (value == null || value.isEmpty()) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid " + constraintName + " constraint. " + propertyName + " must be non-empty for class="
+					+ className + ", field=" + fieldName + ", index=" + index);
+		}
+		return value;
+	}
+
+	private void validateRegex(
+		String constraintName,
+		String regex,
+		String className,
+		String fieldName,
+		int index
+	) {
+		try {
+			Pattern.compile(regex);
+		}
+		catch (PatternSyntaxException exception) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid " + constraintName + " constraint. regex could not be compiled for class="
+					+ className + ", field=" + fieldName + ", index=" + index + ", regex=" + regex,
+				exception);
 		}
 	}
 
-	private void validateExtensionJsonPath(String jsonPath, String className, String fieldName, int index) {
+	private void validateJsonPath(String jsonPath, String className, String fieldName, int index) {
 		try {
 			JsonPath.compile(jsonPath);
 		}
@@ -281,18 +302,6 @@ public class ConstraintMergeService {
 			throw new InvalidConstraintConfigurationException(
 				"Invalid extensions constraint. jsonPath could not be compiled for class="
 					+ className + ", field=" + fieldName + ", index=" + index + ", jsonPath=" + jsonPath,
-				exception);
-		}
-	}
-
-	private void validateExtensionRegex(String regex, String className, String fieldName, int index) {
-		try {
-			java.util.regex.Pattern.compile(regex);
-		}
-		catch (PatternSyntaxException exception) {
-			throw new InvalidConstraintConfigurationException(
-				"Invalid extensions constraint. regex could not be compiled for class="
-					+ className + ", field=" + fieldName + ", index=" + index + ", regex=" + regex,
 				exception);
 		}
 	}

@@ -1,39 +1,26 @@
 package com.example.validatingforminput.validation;
 
-import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
+import java.util.regex.PatternSyntaxException;
 
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 import com.jayway.jsonpath.PathNotFoundException;
+import com.jayway.jsonpath.ReadContext;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 
 public class ExtensionsJsonPathRegexValidator implements ConstraintValidator<ExtensionsJsonPathRegex, Object> {
 
-	private String jsonPath;
-
-	private java.util.regex.Pattern compiledRegex;
+	private Pattern compiledRegex;
 
 	private JsonPath compiledJsonPath;
 
 	@Override
 	public void initialize(ExtensionsJsonPathRegex constraintAnnotation) {
-		this.jsonPath = constraintAnnotation.jsonPath();
-		try {
-			this.compiledRegex = java.util.regex.Pattern.compile(constraintAnnotation.regex());
-		}
-		catch (java.util.regex.PatternSyntaxException exception) {
-			throw new IllegalArgumentException("Invalid regex configured for ExtensionsJsonPathRegex: "
-				+ constraintAnnotation.regex(), exception);
-		}
-		try {
-			this.compiledJsonPath = JsonPath.compile(constraintAnnotation.jsonPath());
-		}
-		catch (InvalidPathException | IllegalArgumentException exception) {
-			throw new IllegalArgumentException("Invalid jsonPath configured for ExtensionsJsonPathRegex: "
-				+ constraintAnnotation.jsonPath(), exception);
-		}
+		this.compiledRegex = compileRegex(constraintAnnotation.regex());
+		this.compiledJsonPath = compileJsonPath(constraintAnnotation.jsonPath());
 	}
 
 	@Override
@@ -42,9 +29,13 @@ public class ExtensionsJsonPathRegexValidator implements ConstraintValidator<Ext
 			return true;
 		}
 
-		List<Object> candidates;
 		try {
-			candidates = readCandidates(value);
+			for (Object candidate : extractCandidates(value)) {
+				if (!matchesCandidate(candidate)) {
+					return false;
+				}
+			}
+			return true;
 		}
 		catch (PathNotFoundException exception) {
 			// jsonPath acts as a condition: if missing, there is nothing to validate.
@@ -53,35 +44,50 @@ public class ExtensionsJsonPathRegexValidator implements ConstraintValidator<Ext
 		catch (RuntimeException exception) {
 			return false;
 		}
-
-		for (Object candidate : candidates) {
-			if (!matchesCandidate(candidate)) {
-				return false;
-			}
-		}
-		return true;
 	}
 
-	private List<Object> readCandidates(Object value) {
-		Object result;
+	private Pattern compileRegex(String regex) {
+		try {
+			return Pattern.compile(regex);
+		}
+		catch (PatternSyntaxException exception) {
+			throw new IllegalArgumentException("Invalid regex configured for ExtensionsJsonPathRegex: " + regex, exception);
+		}
+	}
+
+	private JsonPath compileJsonPath(String jsonPath) {
+		try {
+			return JsonPath.compile(jsonPath);
+		}
+		catch (InvalidPathException | IllegalArgumentException exception) {
+			throw new IllegalArgumentException("Invalid jsonPath configured for ExtensionsJsonPathRegex: " + jsonPath, exception);
+		}
+	}
+
+	private List<?> extractCandidates(Object value) {
+		Object resolvedValue = readJsonPath(value);
+		if (resolvedValue == null) {
+			return List.of();
+		}
+		if (resolvedValue instanceof List<?> listValue) {
+			return listValue;
+		}
+		return List.of(resolvedValue);
+	}
+
+	private Object readJsonPath(Object value) {
 		if (value instanceof CharSequence textValue) {
 			String raw = textValue.toString();
 			if (raw.isBlank()) {
-				return List.of();
+				return null;
 			}
-			result = JsonPath.parse(raw).read(jsonPath);
+			return parseJson(raw).read(compiledJsonPath);
 		}
-		else {
-			result = compiledJsonPath.read(value);
-		}
+		return compiledJsonPath.read(value);
+	}
 
-		if (result == null) {
-			return List.of();
-		}
-		if (result instanceof List<?> listResult) {
-			return new ArrayList<>(listResult);
-		}
-		return List.of(result);
+	private ReadContext parseJson(String raw) {
+		return JsonPath.parse(raw);
 	}
 
 	private boolean matchesCandidate(Object candidate) {

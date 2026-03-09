@@ -430,10 +430,14 @@ for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
 
 Runtime behavior of this validator:
 
+- if the `extensions` field itself is `null`, skip validation
 - evaluate the configured `jsonPath` against the `extensions` field value
 - apply `regex` to each resolved scalar value
+- if the `extensions` field is a blank JSON string, skip validation
 - if the path is missing, treat it as "condition not met" and skip validation
-- if a resolved value exists and does not match, raise a violation
+- if a resolved value is `null`, skip that value
+- if a resolved scalar value does not match, raise a violation
+- if a resolved value is non-scalar (for example, an object), raise a violation
 
 ## `ConstraintMergeService.merge(...)`
 

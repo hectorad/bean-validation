@@ -177,34 +177,6 @@ public class ValidationProperties {
         public void setExtensions(ExtensionsConstraint extensions) {
             this.extensions = (extensions == null) ? new ExtensionsConstraint() : extensions;
         }
-
-        boolean hasConfiguredValues() {
-            return isEnabled(notNull)
-                    || isEnabled(notBlank)
-                    || hasNumericValue(min)
-                    || hasNumericValue(max)
-                    || hasDecimalValue(decimalMin)
-                    || hasDecimalValue(decimalMax)
-                    || hasNumericValue(size.getMin())
-                    || hasNumericValue(size.getMax())
-                    || !pattern.getRegexes().isEmpty()
-                    || !extensions.getRules().isEmpty();
-        }
-
-        private boolean isEnabled(ToggleConstraint constraint) {
-            return Boolean.TRUE.equals(constraint.getValue()) || Boolean.TRUE.equals(constraint.getHardValue());
-        }
-
-        private boolean hasNumericValue(NumericConstraint constraint) {
-            return constraint.getValue() != null || constraint.getHardValue() != null;
-        }
-
-        private boolean hasDecimalValue(DecimalConstraint constraint) {
-            return constraint.getValue() != null
-                || constraint.getHardValue() != null
-                || constraint.getInclusive() != null
-                || constraint.getHardInclusive() != null;
-        }
     }
 
     public static class ToggleConstraint {

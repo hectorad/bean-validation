@@ -137,8 +137,10 @@ public class GeneratedClassMetadataCache {
 			constraints = new ValidationProperties.Constraints();
 		}
 
-		Class<?> fieldType = wrapPrimitive(field.getType());
+		Class<?> rawFieldType = field.getType();
+		Class<?> fieldType = wrapPrimitive(rawFieldType);
 		String fieldName = field.getName();
+		boolean extensionsConfigured = hasConfiguredExtensions(constraints);
 
 		if (isNotBlankEnabled(constraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("notBlank", className, fieldName, fieldType);
@@ -146,19 +148,19 @@ public class GeneratedClassMetadataCache {
 		if ((hasNumericBounds(baseline) || hasNumericBounds(constraints)) && !supportsNumericBounds(fieldType)) {
 			throw unsupportedConstraint("numeric bounds", className, fieldName, fieldType);
 		}
-		if (hasSizeBounds(constraints) && !supportsSize(field.getType())) {
-			throw unsupportedConstraint("size", className, fieldName, field.getType());
+		if (hasSizeBounds(constraints) && !supportsContainerValue(rawFieldType)) {
+			throw unsupportedConstraint("size", className, fieldName, rawFieldType);
 		}
 		if (hasConfiguredPatterns(constraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("pattern", className, fieldName, fieldType);
 		}
-		if (hasConfiguredExtensions(constraints) && !"extensions".equals(fieldName)) {
+		if (extensionsConfigured && !"extensions".equals(fieldName)) {
 			throw new InvalidConstraintConfigurationException(
 				"Constraint extensions can only be configured for class="
 					+ className + ", field=extensions");
 		}
-		if (hasConfiguredExtensions(constraints) && !supportsExtensions(field.getType())) {
-			throw unsupportedConstraint("extensions", className, fieldName, field.getType());
+		if (extensionsConfigured && !supportsContainerValue(rawFieldType)) {
+			throw unsupportedConstraint("extensions", className, fieldName, rawFieldType);
 		}
 	}
 
@@ -318,14 +320,7 @@ public class GeneratedClassMetadataCache {
 			|| fieldType == Long.class;
 	}
 
-	private boolean supportsSize(Class<?> fieldType) {
-		return fieldType.isArray()
-			|| CharSequence.class.isAssignableFrom(fieldType)
-			|| java.util.Collection.class.isAssignableFrom(fieldType)
-			|| java.util.Map.class.isAssignableFrom(fieldType);
-	}
-
-	private boolean supportsExtensions(Class<?> fieldType) {
+	private boolean supportsContainerValue(Class<?> fieldType) {
 		return fieldType.isArray()
 			|| CharSequence.class.isAssignableFrom(fieldType)
 			|| java.util.Collection.class.isAssignableFrom(fieldType)
