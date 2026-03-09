@@ -19,98 +19,38 @@ public class ConstraintMergeService {
 		String className,
 		String fieldName
 	) {
-		ValidationProperties.Constraints effectiveConfig =
-			(configuredConstraints == null) ? new ValidationProperties.Constraints() : configuredConstraints;
+		ValidationProperties.Constraints effectiveConfig = defaultConstraints(configuredConstraints);
+		BooleanConstraintState notNull = resolveBooleanConstraint(baseline.notNull(), effectiveConfig.getNotNull());
+		BooleanConstraintState notBlank = resolveBooleanConstraint(baseline.notBlank(), effectiveConfig.getNotBlank());
+		BoundCandidate minCandidate = resolveLowerBound(
+			baseline.min(),
+			effectiveConfig.getMin(),
+			effectiveConfig.getDecimalMin(),
+			className,
+			fieldName,
+			"decimal-min");
+		BoundCandidate maxCandidate = resolveUpperBound(
+			baseline.max(),
+			effectiveConfig.getMax(),
+			effectiveConfig.getDecimalMax(),
+			className,
+			fieldName,
+			"decimal-max");
+		SizeBoundCandidate sizeMinCandidate = resolveSizeMin(
+			baseline.sizeMin(),
+			effectiveConfig.getSize().getMin(),
+			className,
+			fieldName);
+		SizeBoundCandidate sizeMaxCandidate = resolveSizeMax(
+			baseline.sizeMax(),
+			effectiveConfig.getSize().getMax(),
+			className,
+			fieldName);
 
-		boolean configNotNullEnabled = isTrue(effectiveConfig.getNotNull().getValue())
-			|| isTrue(effectiveConfig.getNotNull().getHardValue());
-		boolean configNotBlankEnabled = isTrue(effectiveConfig.getNotBlank().getValue())
-			|| isTrue(effectiveConfig.getNotBlank().getHardValue());
-
-		boolean notNull = baseline.notNull() || configNotNullEnabled;
-		boolean notBlank = baseline.notBlank() || configNotBlankEnabled;
-		String notNullMessage = configNotNullEnabled ? effectiveConfig.getNotNull().getMessage() : null;
-		String notBlankMessage = configNotBlankEnabled ? effectiveConfig.getNotBlank().getMessage() : null;
-
-		BoundCandidate minCandidate = strictestLowerBound(
-			new BoundCandidate(baseline.min(), null),
-			toInclusiveBound(effectiveConfig.getMin().getValue(), effectiveConfig.getMin().getMessage()),
-			toInclusiveBound(effectiveConfig.getMin().getHardValue(), effectiveConfig.getMin().getMessage()),
-			toDecimalBound(
-				effectiveConfig.getDecimalMin().getValue(),
-				effectiveConfig.getDecimalMin().getInclusive(),
-				effectiveConfig.getDecimalMin().getMessage(),
-				className,
-				fieldName,
-				"decimal-min.value",
-				"decimal-min.inclusive"),
-			toDecimalBound(
-				effectiveConfig.getDecimalMin().getHardValue(),
-				effectiveConfig.getDecimalMin().getHardInclusive(),
-				effectiveConfig.getDecimalMin().getMessage(),
-				className,
-				fieldName,
-				"decimal-min.hard-value",
-				"decimal-min.hard-inclusive"));
-		BoundCandidate maxCandidate = strictestUpperBound(
-			new BoundCandidate(baseline.max(), null),
-			toInclusiveBound(effectiveConfig.getMax().getValue(), effectiveConfig.getMax().getMessage()),
-			toInclusiveBound(effectiveConfig.getMax().getHardValue(), effectiveConfig.getMax().getMessage()),
-			toDecimalBound(
-				effectiveConfig.getDecimalMax().getValue(),
-				effectiveConfig.getDecimalMax().getInclusive(),
-				effectiveConfig.getDecimalMax().getMessage(),
-				className,
-				fieldName,
-				"decimal-max.value",
-				"decimal-max.inclusive"),
-			toDecimalBound(
-				effectiveConfig.getDecimalMax().getHardValue(),
-				effectiveConfig.getDecimalMax().getHardInclusive(),
-				effectiveConfig.getDecimalMax().getMessage(),
-				className,
-				fieldName,
-				"decimal-max.hard-value",
-				"decimal-max.hard-inclusive"));
-
-		NumericBound min = (minCandidate == null) ? null : minCandidate.bound();
-		String minMessage = (minCandidate == null) ? null : minCandidate.message();
-		NumericBound max = (maxCandidate == null) ? null : maxCandidate.bound();
-		String maxMessage = (maxCandidate == null) ? null : maxCandidate.message();
-
-		SizeBoundCandidate sizeMinCandidate = strictestComparableLowerBound(
-			new SizeBoundCandidate(baseline.sizeMin(), null),
-			toSizeBound(
-				effectiveConfig.getSize().getMin().getValue(),
-				effectiveConfig.getSize().getMin().getMessage(),
-				className,
-				fieldName,
-				"size.min.value"),
-			toSizeBound(
-				effectiveConfig.getSize().getMin().getHardValue(),
-				effectiveConfig.getSize().getMin().getMessage(),
-				className,
-				fieldName,
-				"size.min.hardValue"));
-		SizeBoundCandidate sizeMaxCandidate = strictestComparableUpperBound(
-			new SizeBoundCandidate(baseline.sizeMax(), null),
-			toSizeBound(
-				effectiveConfig.getSize().getMax().getValue(),
-				effectiveConfig.getSize().getMax().getMessage(),
-				className,
-				fieldName,
-				"size.max.value"),
-			toSizeBound(
-				effectiveConfig.getSize().getMax().getHardValue(),
-				effectiveConfig.getSize().getMax().getMessage(),
-				className,
-				fieldName,
-				"size.max.hardValue"));
-
-		Integer sizeMin = (sizeMinCandidate == null) ? null : sizeMinCandidate.value();
-		Integer sizeMax = (sizeMaxCandidate == null) ? null : sizeMaxCandidate.value();
-		String sizeMinMessage = (sizeMinCandidate == null) ? null : sizeMinCandidate.message();
-		String sizeMaxMessage = (sizeMaxCandidate == null) ? null : sizeMaxCandidate.message();
+		NumericBound min = bound(minCandidate);
+		NumericBound max = bound(maxCandidate);
+		Integer sizeMin = sizeValue(sizeMinCandidate);
+		Integer sizeMax = sizeValue(sizeMaxCandidate);
 
 		validateNumericBounds(min, max, className, fieldName);
 		if (sizeMin != null && sizeMax != null && sizeMin > sizeMax) {
@@ -130,24 +70,142 @@ public class ConstraintMergeService {
 			toConfiguredExtensionRules(effectiveConfig.getExtensions().getRules(), className, fieldName);
 
 		return new EffectiveFieldConstraints(
-			notNull,
-			notNullMessage,
-			notBlank,
-			notBlankMessage,
+			notNull.enabled(),
+			notNull.message(),
+			notBlank.enabled(),
+			notBlank.message(),
 			min,
-			minMessage,
+			message(minCandidate),
 			max,
-			maxMessage,
+			message(maxCandidate),
 			sizeMin,
-			sizeMinMessage,
+			message(sizeMinCandidate),
 			sizeMax,
-			sizeMaxMessage,
+			message(sizeMaxCandidate),
 			patterns,
 			extensionRules);
 	}
 
+	private ValidationProperties.Constraints defaultConstraints(ValidationProperties.Constraints configuredConstraints) {
+		return (configuredConstraints == null) ? new ValidationProperties.Constraints() : configuredConstraints;
+	}
+
 	private boolean isTrue(Boolean value) {
 		return Boolean.TRUE.equals(value);
+	}
+
+	private BooleanConstraintState resolveBooleanConstraint(
+		boolean baselineEnabled,
+		ValidationProperties.ToggleConstraint configuredConstraint
+	) {
+		boolean configuredEnabled = isTrue(configuredConstraint.getValue()) || isTrue(configuredConstraint.getHardValue());
+		return new BooleanConstraintState(
+			baselineEnabled || configuredEnabled,
+			configuredEnabled ? configuredConstraint.getMessage() : null);
+	}
+
+	private BoundCandidate resolveLowerBound(
+		NumericBound baseline,
+		ValidationProperties.NumericConstraint numericConstraint,
+		ValidationProperties.DecimalConstraint decimalConstraint,
+		String className,
+		String fieldName,
+		String decimalPropertyPrefix
+	) {
+		return strictestLowerBound(
+			baselineCandidate(baseline),
+			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
+			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
+			toDecimalBound(
+				decimalConstraint.getValue(),
+				decimalConstraint.getInclusive(),
+				decimalConstraint.getMessage(),
+				className,
+				fieldName,
+				decimalPropertyPrefix + ".value",
+				decimalPropertyPrefix + ".inclusive"),
+			toDecimalBound(
+				decimalConstraint.getHardValue(),
+				decimalConstraint.getHardInclusive(),
+				decimalConstraint.getMessage(),
+				className,
+				fieldName,
+				decimalPropertyPrefix + ".hard-value",
+				decimalPropertyPrefix + ".hard-inclusive"));
+	}
+
+	private BoundCandidate resolveUpperBound(
+		NumericBound baseline,
+		ValidationProperties.NumericConstraint numericConstraint,
+		ValidationProperties.DecimalConstraint decimalConstraint,
+		String className,
+		String fieldName,
+		String decimalPropertyPrefix
+	) {
+		return strictestUpperBound(
+			baselineCandidate(baseline),
+			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
+			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
+			toDecimalBound(
+				decimalConstraint.getValue(),
+				decimalConstraint.getInclusive(),
+				decimalConstraint.getMessage(),
+				className,
+				fieldName,
+				decimalPropertyPrefix + ".value",
+				decimalPropertyPrefix + ".inclusive"),
+			toDecimalBound(
+				decimalConstraint.getHardValue(),
+				decimalConstraint.getHardInclusive(),
+				decimalConstraint.getMessage(),
+				className,
+				fieldName,
+				decimalPropertyPrefix + ".hard-value",
+				decimalPropertyPrefix + ".hard-inclusive"));
+	}
+
+	private SizeBoundCandidate resolveSizeMin(
+		Integer baseline,
+		ValidationProperties.NumericConstraint configuredConstraint,
+		String className,
+		String fieldName
+	) {
+		return strictestComparableLowerBound(
+			sizeCandidate(baseline),
+			toSizeBound(
+				configuredConstraint.getValue(),
+				configuredConstraint.getMessage(),
+				className,
+				fieldName,
+				"size.min.value"),
+			toSizeBound(
+				configuredConstraint.getHardValue(),
+				configuredConstraint.getMessage(),
+				className,
+				fieldName,
+				"size.min.hardValue"));
+	}
+
+	private SizeBoundCandidate resolveSizeMax(
+		Integer baseline,
+		ValidationProperties.NumericConstraint configuredConstraint,
+		String className,
+		String fieldName
+	) {
+		return strictestComparableUpperBound(
+			sizeCandidate(baseline),
+			toSizeBound(
+				configuredConstraint.getValue(),
+				configuredConstraint.getMessage(),
+				className,
+				fieldName,
+				"size.max.value"),
+			toSizeBound(
+				configuredConstraint.getHardValue(),
+				configuredConstraint.getMessage(),
+				className,
+				fieldName,
+				"size.max.hardValue"));
 	}
 
 	private BoundCandidate strictestLowerBound(BoundCandidate... bounds) {
@@ -220,6 +278,10 @@ public class ConstraintMergeService {
 
 	private BoundCandidate toInclusiveBound(Long value, String message) {
 		return (value == null) ? null : new BoundCandidate(NumericBound.inclusive(value), message);
+	}
+
+	private BoundCandidate baselineCandidate(NumericBound bound) {
+		return new BoundCandidate(bound, null);
 	}
 
 	private BoundCandidate toDecimalBound(
@@ -302,6 +364,26 @@ public class ConstraintMergeService {
 	) {
 		Integer bound = toSizeInteger(value, className, fieldName, propertyName);
 		return (bound == null) ? null : new SizeBoundCandidate(bound, message);
+	}
+
+	private SizeBoundCandidate sizeCandidate(Integer value) {
+		return new SizeBoundCandidate(value, null);
+	}
+
+	private NumericBound bound(BoundCandidate candidate) {
+		return (candidate == null) ? null : candidate.bound();
+	}
+
+	private Integer sizeValue(SizeBoundCandidate candidate) {
+		return (candidate == null) ? null : candidate.value();
+	}
+
+	private String message(BoundCandidate candidate) {
+		return (candidate == null) ? null : candidate.message();
+	}
+
+	private String message(SizeBoundCandidate candidate) {
+		return (candidate == null) ? null : candidate.message();
 	}
 
 	private Integer toSizeInteger(Long value, String className, String fieldName, String propertyName) {
@@ -409,5 +491,8 @@ public class ConstraintMergeService {
 	}
 
 	private record SizeBoundCandidate(Integer value, String message) {
+	}
+
+	private record BooleanConstraintState(boolean enabled, String message) {
 	}
 }

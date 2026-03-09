@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
 
+import org.hibernate.validator.cfg.ConstraintDef;
 import org.hibernate.validator.cfg.ConstraintMapping;
 import org.hibernate.validator.cfg.GenericConstraintDef;
 import org.hibernate.validator.cfg.context.PropertyConstraintMappingContext;
@@ -73,53 +74,40 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 		PropertyConstraintMappingContext propertyContext = typeContext.field(fieldName).ignoreAnnotations(true);
 
 		if (effectiveConstraints.notNull()) {
-			NotNullDef notNullDef = new NotNullDef();
-			if (effectiveConstraints.notNullMessage() != null) {
-				notNullDef.message(effectiveConstraints.notNullMessage());
-			}
-			propertyContext.constraint(notNullDef);
+			applyConstraint(propertyContext, new NotNullDef(), effectiveConstraints.notNullMessage());
 		}
 		if (effectiveConstraints.notBlank()) {
-			NotBlankDef notBlankDef = new NotBlankDef();
-			if (effectiveConstraints.notBlankMessage() != null) {
-				notBlankDef.message(effectiveConstraints.notBlankMessage());
-			}
-			propertyContext.constraint(notBlankDef);
+			applyConstraint(propertyContext, new NotBlankDef(), effectiveConstraints.notBlankMessage());
 		}
 		if (effectiveConstraints.min() != null) {
-			DecimalMinDef minDef = new DecimalMinDef()
+			applyConstraint(
+				propertyContext,
+				new DecimalMinDef()
 				.value(effectiveConstraints.min().value().toPlainString())
-				.inclusive(effectiveConstraints.min().inclusive());
-			if (effectiveConstraints.minMessage() != null) {
-				minDef.message(effectiveConstraints.minMessage());
-			}
-			propertyContext.constraint(minDef);
+				.inclusive(effectiveConstraints.min().inclusive()),
+				effectiveConstraints.minMessage());
 		}
 		if (effectiveConstraints.max() != null) {
-			DecimalMaxDef maxDef = new DecimalMaxDef()
+			applyConstraint(
+				propertyContext,
+				new DecimalMaxDef()
 				.value(effectiveConstraints.max().value().toPlainString())
-				.inclusive(effectiveConstraints.max().inclusive());
-			if (effectiveConstraints.maxMessage() != null) {
-				maxDef.message(effectiveConstraints.maxMessage());
-			}
-			propertyContext.constraint(maxDef);
+				.inclusive(effectiveConstraints.max().inclusive()),
+				effectiveConstraints.maxMessage());
 		}
 		if (effectiveConstraints.sizeMin() != null || effectiveConstraints.sizeMax() != null) {
 			boolean splitByMessage = effectiveConstraints.sizeMin() != null
 				&& effectiveConstraints.sizeMax() != null
 				&& !Objects.equals(effectiveConstraints.sizeMinMessage(), effectiveConstraints.sizeMaxMessage());
 			if (splitByMessage) {
-				SizeDef minSizeDef = new SizeDef().min(effectiveConstraints.sizeMin());
-				if (effectiveConstraints.sizeMinMessage() != null) {
-					minSizeDef.message(effectiveConstraints.sizeMinMessage());
-				}
-				propertyContext.constraint(minSizeDef);
-
-				SizeDef maxSizeDef = new SizeDef().max(effectiveConstraints.sizeMax());
-				if (effectiveConstraints.sizeMaxMessage() != null) {
-					maxSizeDef.message(effectiveConstraints.sizeMaxMessage());
-				}
-				propertyContext.constraint(maxSizeDef);
+				applyConstraint(
+					propertyContext,
+					new SizeDef().min(effectiveConstraints.sizeMin()),
+					effectiveConstraints.sizeMinMessage());
+				applyConstraint(
+					propertyContext,
+					new SizeDef().max(effectiveConstraints.sizeMax()),
+					effectiveConstraints.sizeMaxMessage());
 			}
 			else {
 				SizeDef sizeDef = new SizeDef();
@@ -131,10 +119,7 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				}
 				String mergedSizeMessage =
 					(effectiveConstraints.sizeMin() != null) ? effectiveConstraints.sizeMinMessage() : effectiveConstraints.sizeMaxMessage();
-				if (mergedSizeMessage != null) {
-					sizeDef.message(mergedSizeMessage);
-				}
-				propertyContext.constraint(sizeDef);
+				applyConstraint(propertyContext, sizeDef, mergedSizeMessage);
 			}
 		}
 		for (PatternRule patternRule : effectiveConstraints.patterns()) {
@@ -142,20 +127,24 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 			if (!patternRule.flags().isEmpty()) {
 				patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
 			}
-			if (patternRule.message() != null) {
-				patternDef.message(patternRule.message());
-			}
-			propertyContext.constraint(patternDef);
+			applyConstraint(propertyContext, patternDef, patternRule.message());
 		}
 		for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
-			GenericConstraintDef<ExtensionsJsonPathRegex> extensionDef = new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
-				.param("jsonPath", extensionRule.jsonPath())
-				.param("regex", extensionRule.regex());
-			if (extensionRule.message() != null) {
-				extensionDef.message(extensionRule.message());
-			}
-			propertyContext.constraint(extensionDef);
+			applyConstraint(
+				propertyContext,
+				new GenericConstraintDef<>(ExtensionsJsonPathRegex.class)
+					.param("jsonPath", extensionRule.jsonPath())
+					.param("regex", extensionRule.regex()),
+				extensionRule.message());
 		}
+	}
+
+	private <D extends ConstraintDef<D, ?>> void applyConstraint(
+		PropertyConstraintMappingContext propertyContext,
+		D constraintDefinition,
+		String message
+	) {
+		propertyContext.constraint((message == null) ? constraintDefinition : constraintDefinition.message(message));
 	}
 
 	private Map<String, ValidationProperties.ClassMapping> indexByClass(ValidationProperties properties) {
