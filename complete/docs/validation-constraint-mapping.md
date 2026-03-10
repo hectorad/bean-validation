@@ -72,6 +72,8 @@ com:
               pattern:
                 regexes:
                   - ^[A-Za-z]+$
+                flags:
+                  - CASE_INSENSITIVE
                 message: Name must contain only letters
           - field-name: age
             constraints:
@@ -602,7 +604,9 @@ The merge service rejects these immediately.
 
 ```java
 List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
-appendConfiguredPatterns(patterns, effectiveConfig.getPattern().getRegexes(), className, fieldName);
+appendConfiguredPatterns(patterns, effectiveConfig.getPattern().getRegexes(),
+	effectiveConfig.getPattern().getFlags(), effectiveConfig.getPattern().getMessage(),
+	className, fieldName);
 ```
 
 Patterns are not replaced.
@@ -613,12 +617,15 @@ That means configured patterns make the field stricter by adding more rules.
 
 ### Configured regexes are validated
 
-`appendConfiguredPatterns(...)` does two checks before adding a regex:
+`appendConfiguredPatterns(...)` does three things before adding a regex:
 
-1. regex must not be null or empty
-2. regex must compile successfully
+1. parses configured flag names (e.g., `CASE_INSENSITIVE`) into `Pattern.Flag` enum values, rejecting invalid names
+2. validates that each regex is not null or empty
+3. validates that each regex compiles successfully
 
-If either check fails, the method throws `InvalidConstraintConfigurationException`.
+If any check fails, the method throws `InvalidConstraintConfigurationException`.
+
+Configured flags apply to all regexes in the same `pattern` block. Baseline patterns keep their own flags from annotations.
 
 ### `extensions` rules are validated and merged
 

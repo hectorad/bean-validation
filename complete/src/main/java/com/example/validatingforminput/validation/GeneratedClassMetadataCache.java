@@ -281,12 +281,8 @@ public class GeneratedClassMetadataCache {
 			|| constraints.getMax().getHardValue() != null
 			|| constraints.getDecimalMin().getValue() != null
 			|| constraints.getDecimalMin().getHardValue() != null
-			|| constraints.getDecimalMin().getInclusive() != null
-			|| constraints.getDecimalMin().getHardInclusive() != null
 			|| constraints.getDecimalMax().getValue() != null
-			|| constraints.getDecimalMax().getHardValue() != null
-			|| constraints.getDecimalMax().getInclusive() != null
-			|| constraints.getDecimalMax().getHardInclusive() != null;
+			|| constraints.getDecimalMax().getHardValue() != null;
 	}
 
 	private boolean hasSizeBounds(ValidationProperties.Constraints constraints) {

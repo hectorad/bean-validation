@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
+import java.util.function.BinaryOperator;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -21,30 +22,38 @@ public class ConstraintMergeService {
 		ValidationProperties.Constraints effectiveConfig = defaultConstraints(configuredConstraints);
 		BooleanConstraintState notNull = resolveBooleanConstraint(baseline.notNull(), effectiveConfig.getNotNull());
 		BooleanConstraintState notBlank = resolveBooleanConstraint(baseline.notBlank(), effectiveConfig.getNotBlank());
-		BoundCandidate minCandidate = resolveLowerBound(
+		BoundCandidate minCandidate = resolveBound(
 			baseline.min(),
 			effectiveConfig.getMin(),
 			effectiveConfig.getDecimalMin(),
 			className,
 			fieldName,
-			"decimal-min");
-		BoundCandidate maxCandidate = resolveUpperBound(
+			"decimal-min",
+			NumericBound::stricterLower);
+		BoundCandidate maxCandidate = resolveBound(
 			baseline.max(),
 			effectiveConfig.getMax(),
 			effectiveConfig.getDecimalMax(),
 			className,
 			fieldName,
-			"decimal-max");
-		SizeBoundCandidate sizeMinCandidate = resolveSizeMin(
+			"decimal-max",
+			NumericBound::stricterUpper);
+		SizeBoundCandidate sizeMinCandidate = resolveSizeBound(
 			baseline.sizeMin(),
 			effectiveConfig.getSize().getMin(),
 			className,
-			fieldName);
-		SizeBoundCandidate sizeMaxCandidate = resolveSizeMax(
+			fieldName,
+			"size.min.value",
+			"size.min.hardValue",
+			true);
+		SizeBoundCandidate sizeMaxCandidate = resolveSizeBound(
 			baseline.sizeMax(),
 			effectiveConfig.getSize().getMax(),
 			className,
-			fieldName);
+			fieldName,
+			"size.max.value",
+			"size.max.hardValue",
+			false);
 
 		NumericBound min = bound(minCandidate);
 		NumericBound max = bound(maxCandidate);
@@ -104,15 +113,17 @@ public class ConstraintMergeService {
 			configuredEnabled ? configuredConstraint.getMessage() : null);
 	}
 
-	private BoundCandidate resolveLowerBound(
+	private BoundCandidate resolveBound(
 		NumericBound baseline,
 		ValidationProperties.NumericConstraint numericConstraint,
 		ValidationProperties.DecimalConstraint decimalConstraint,
 		String className,
 		String fieldName,
-		String decimalPropertyPrefix
+		String decimalPropertyPrefix,
+		BinaryOperator<NumericBound> numericSelector
 	) {
-		return strictestLowerBound(
+		return strictestBound(
+			numericSelector,
 			baselineCandidate(baseline),
 			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
 			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
@@ -134,125 +145,60 @@ public class ConstraintMergeService {
 				decimalPropertyPrefix + ".hard-inclusive"));
 	}
 
-	private BoundCandidate resolveUpperBound(
-		NumericBound baseline,
-		ValidationProperties.NumericConstraint numericConstraint,
-		ValidationProperties.DecimalConstraint decimalConstraint,
+	private SizeBoundCandidate resolveSizeBound(
+		Integer baseline,
+		ValidationProperties.NumericConstraint configuredConstraint,
 		String className,
 		String fieldName,
-		String decimalPropertyPrefix
+		String valueProperty,
+		String hardValueProperty,
+		boolean selectStricterLower
 	) {
-		return strictestUpperBound(
-			baselineCandidate(baseline),
-			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
-			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
-			toDecimalBound(
-				decimalConstraint.getValue(),
-				decimalConstraint.getInclusive(),
-				decimalConstraint.getMessage(),
-				className,
-				fieldName,
-				decimalPropertyPrefix + ".value",
-				decimalPropertyPrefix + ".inclusive"),
-			toDecimalBound(
-				decimalConstraint.getHardValue(),
-				decimalConstraint.getHardInclusive(),
-				decimalConstraint.getMessage(),
-				className,
-				fieldName,
-				decimalPropertyPrefix + ".hard-value",
-				decimalPropertyPrefix + ".hard-inclusive"));
-	}
-
-	private SizeBoundCandidate resolveSizeMin(
-		Integer baseline,
-		ValidationProperties.NumericConstraint configuredConstraint,
-		String className,
-		String fieldName
-	) {
-		return strictestComparableLowerBound(
+		return strictestSizeBound(
+			selectStricterLower,
 			sizeCandidate(baseline),
 			toSizeBound(
 				configuredConstraint.getValue(),
 				configuredConstraint.getMessage(),
 				className,
 				fieldName,
-				"size.min.value"),
+				valueProperty),
 			toSizeBound(
 				configuredConstraint.getHardValue(),
 				configuredConstraint.getMessage(),
 				className,
 				fieldName,
-				"size.min.hardValue"));
+				hardValueProperty));
 	}
 
-	private SizeBoundCandidate resolveSizeMax(
-		Integer baseline,
-		ValidationProperties.NumericConstraint configuredConstraint,
-		String className,
-		String fieldName
+	private BoundCandidate strictestBound(BinaryOperator<NumericBound> numericSelector, BoundCandidate... bounds) {
+		BoundCandidate result = null;
+		for (BoundCandidate bound : bounds) {
+			result = selectStricterBound(result, bound, numericSelector);
+		}
+		return result;
+	}
+
+	@SafeVarargs
+	private final SizeBoundCandidate strictestSizeBound(boolean selectStricterLower, SizeBoundCandidate... bounds) {
+		SizeBoundCandidate result = null;
+		for (SizeBoundCandidate bound : bounds) {
+			if (bound == null || bound.value() == null) {
+				continue;
+			}
+			if (result == null
+				|| (selectStricterLower ? bound.value().compareTo(result.value()) > 0 : bound.value().compareTo(result.value()) < 0)) {
+				result = bound;
+			}
+		}
+		return result;
+	}
+
+	private BoundCandidate selectStricterBound(
+		BoundCandidate current,
+		BoundCandidate candidate,
+		BinaryOperator<NumericBound> numericSelector
 	) {
-		return strictestComparableUpperBound(
-			sizeCandidate(baseline),
-			toSizeBound(
-				configuredConstraint.getValue(),
-				configuredConstraint.getMessage(),
-				className,
-				fieldName,
-				"size.max.value"),
-			toSizeBound(
-				configuredConstraint.getHardValue(),
-				configuredConstraint.getMessage(),
-				className,
-				fieldName,
-				"size.max.hardValue"));
-	}
-
-	private BoundCandidate strictestLowerBound(BoundCandidate... bounds) {
-		BoundCandidate result = null;
-		for (BoundCandidate bound : bounds) {
-			result = stricterLower(result, bound);
-		}
-		return result;
-	}
-
-	private BoundCandidate strictestUpperBound(BoundCandidate... bounds) {
-		BoundCandidate result = null;
-		for (BoundCandidate bound : bounds) {
-			result = stricterUpper(result, bound);
-		}
-		return result;
-	}
-
-	@SafeVarargs
-	private final SizeBoundCandidate strictestComparableLowerBound(SizeBoundCandidate... bounds) {
-		SizeBoundCandidate result = null;
-		for (SizeBoundCandidate bound : bounds) {
-			if (bound == null || bound.value() == null) {
-				continue;
-			}
-			if (result == null || bound.value().compareTo(result.value()) > 0) {
-				result = bound;
-			}
-		}
-		return result;
-	}
-
-	@SafeVarargs
-	private final SizeBoundCandidate strictestComparableUpperBound(SizeBoundCandidate... bounds) {
-		SizeBoundCandidate result = null;
-		for (SizeBoundCandidate bound : bounds) {
-			if (bound == null || bound.value() == null) {
-				continue;
-			}
-			if (result == null || bound.value().compareTo(result.value()) < 0) {
-				result = bound;
-			}
-		}
-		return result;
-	}
-
-	private BoundCandidate stricterLower(BoundCandidate current, BoundCandidate candidate) {
 		if (candidate == null || candidate.bound() == null) {
 			return current;
 		}
@@ -260,19 +206,7 @@ public class ConstraintMergeService {
 			return candidate;
 		}
 
-		NumericBound winner = NumericBound.stricterLower(current.bound(), candidate.bound());
-		return (winner == candidate.bound()) ? candidate : current;
-	}
-
-	private BoundCandidate stricterUpper(BoundCandidate current, BoundCandidate candidate) {
-		if (candidate == null || candidate.bound() == null) {
-			return current;
-		}
-		if (current == null || current.bound() == null) {
-			return candidate;
-		}
-
-		NumericBound winner = NumericBound.stricterUpper(current.bound(), candidate.bound());
+		NumericBound winner = numericSelector.apply(current.bound(), candidate.bound());
 		return (winner == candidate.bound()) ? candidate : current;
 	}
 

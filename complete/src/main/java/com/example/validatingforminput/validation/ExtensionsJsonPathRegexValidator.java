@@ -41,7 +41,7 @@ public class ExtensionsJsonPathRegexValidator implements ConstraintValidator<Ext
 			// jsonPath acts as a condition: if missing, there is nothing to validate.
 			return true;
 		}
-		catch (RuntimeException exception) {
+		catch (com.jayway.jsonpath.JsonPathException exception) {
 			return false;
 		}
 	}
