@@ -106,7 +106,6 @@ public class GeneratedClassMetadataCache {
 		while (current != null && current != Object.class) {
 			try {
 				Field declaredField = current.getDeclaredField(fieldName);
-				declaredField.setAccessible(true);
 				return declaredField;
 			}
 			catch (NoSuchFieldException ignored) {
@@ -218,7 +217,6 @@ public class GeneratedClassMetadataCache {
 				try {
 					Method method = current.getDeclaredMethod(getterName);
 					if (method.getParameterCount() == 0) {
-						method.setAccessible(true);
 						return java.util.Optional.of(method);
 					}
 				}
@@ -229,14 +227,6 @@ public class GeneratedClassMetadataCache {
 			current = current.getSuperclass();
 		}
 		return java.util.Optional.empty();
-	}
-
-	private Long maxNullable(Long first, long second) {
-		return (first == null) ? second : Math.max(first, second);
-	}
-
-	private Long minNullable(Long first, long second) {
-		return (first == null) ? second : Math.min(first, second);
 	}
 
 	private NumericBound parseDecimalAnnotationBound(

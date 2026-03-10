@@ -1,6 +1,5 @@
 package com.example.validatingforminput.validation;
 
-import java.util.ArrayList;
 import java.util.List;
 
 public record BaselineFieldConstraints(
@@ -18,6 +17,6 @@ public record BaselineFieldConstraints(
 	}
 
 	public static BaselineFieldConstraints empty() {
-		return new BaselineFieldConstraints(false, false, null, null, null, null, new ArrayList<>());
+		return new BaselineFieldConstraints(false, false, null, null, null, null, List.of());
 	}
 }
