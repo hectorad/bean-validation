@@ -57,7 +57,7 @@ class ValidationMetadataPreservationIntegrationTests {
 	void shouldPreserveCascadeValidationOnConfiguredField() {
 		CascadeTarget target = new CascadeTarget();
 		Contact contact = new Contact();
-//		contact.setName(" ");
+		contact.setName(" ");
 		target.setContact(contact);
 
 		Set<ConstraintViolation<CascadeTarget>> violations = validator.validate(target);

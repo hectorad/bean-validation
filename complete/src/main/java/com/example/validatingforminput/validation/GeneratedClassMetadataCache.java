@@ -104,8 +104,9 @@ public class GeneratedClassMetadataCache {
 	) {
 		String fieldName = fieldMapping.getFieldName();
 		Field field = resolveField(clazz, className, fieldName);
-		BaselineFieldConstraints baseline = extractBaseline(clazz, field, className);
-		FieldValidationMetadata validationMetadata = extractValidationMetadata(clazz, field);
+		Optional<Method> getter = findGetter(clazz, fieldName);
+		BaselineFieldConstraints baseline = extractBaseline(field, getter, className);
+		FieldValidationMetadata validationMetadata = extractValidationMetadata(field, getter);
 		validateConstraints(className, field, baseline, fieldMapping.getConstraints());
 		return new ResolvedFieldMapping(fieldName, baseline, validationMetadata);
 	}
@@ -148,19 +149,17 @@ public class GeneratedClassMetadataCache {
 			"Configured field was not found. class=" + className + ", field=" + fieldName);
 	}
 
-	private BaselineFieldConstraints extractBaseline(Class<?> clazz, Field field, String className) {
+	private BaselineFieldConstraints extractBaseline(Field field, Optional<Method> getter, String className) {
 		BaselineAccumulator baselineAccumulator = new BaselineAccumulator();
 		collectAnnotationBaseline(field, baselineAccumulator, className, field.getName());
-		findGetter(clazz, field.getName())
-			.ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator, className, field.getName()));
+		getter.ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator, className, field.getName()));
 		return baselineAccumulator.toBaseline();
 	}
 
-	private FieldValidationMetadata extractValidationMetadata(Class<?> clazz, Field field) {
+	private FieldValidationMetadata extractValidationMetadata(Field field, Optional<Method> getter) {
 		ValidationMetadataAccumulator accumulator = new ValidationMetadataAccumulator();
 		collectValidationMetadata(field, field.getAnnotatedType(), accumulator);
-		findGetter(clazz, field.getName())
-			.ifPresent(method -> collectValidationMetadata(method, method.getAnnotatedReturnType(), accumulator));
+		getter.ifPresent(method -> collectValidationMetadata(method, method.getAnnotatedReturnType(), accumulator));
 		return accumulator.toMetadata();
 	}
 
@@ -514,6 +513,12 @@ public class GeneratedClassMetadataCache {
 		}
 	}
 
+	private static List<GroupConversionMapping> toGroupConversionMappings(Map<Class<?>, Class<?>> groupConversions) {
+		return groupConversions.entrySet().stream()
+			.map(entry -> new GroupConversionMapping(entry.getKey(), entry.getValue()))
+			.toList();
+	}
+
 	private static final class ValidationMetadataAccumulator {
 
 		private final Set<Annotation> constraintAnnotations = new LinkedHashSet<>();
@@ -532,9 +537,7 @@ public class GeneratedClassMetadataCache {
 			return new FieldValidationMetadata(
 				new ArrayList<>(constraintAnnotations),
 				cascaded,
-				groupConversions.entrySet().stream()
-					.map(entry -> new GroupConversionMapping(entry.getKey(), entry.getValue()))
-					.toList(),
+				toGroupConversionMappings(groupConversions),
 				containerMetadata);
 		}
 	}
@@ -552,9 +555,7 @@ public class GeneratedClassMetadataCache {
 				path,
 				new ArrayList<>(constraintAnnotations),
 				cascaded,
-				groupConversions.entrySet().stream()
-					.map(entry -> new GroupConversionMapping(entry.getKey(), entry.getValue()))
-					.toList());
+				toGroupConversionMappings(groupConversions));
 		}
 	}
 }

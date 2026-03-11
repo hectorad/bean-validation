@@ -27,7 +27,7 @@ record FieldValidationMetadata(
 			&& containerElements.isEmpty();
 	}
 
-	private static <T> List<T> copyOf(List<T> values) {
+	static <T> List<T> copyOf(List<T> values) {
 		return (values == null) ? List.of() : List.copyOf(values);
 	}
 }
@@ -43,16 +43,12 @@ record ContainerElementValidationMetadata(
 ) {
 
 	ContainerElementValidationMetadata {
-		path = copyOf(path);
-		constraintAnnotations = copyOf(constraintAnnotations);
-		groupConversions = copyOf(groupConversions);
+		path = FieldValidationMetadata.copyOf(path);
+		constraintAnnotations = FieldValidationMetadata.copyOf(constraintAnnotations);
+		groupConversions = FieldValidationMetadata.copyOf(groupConversions);
 	}
 
 	boolean isEmpty() {
 		return constraintAnnotations.isEmpty() && !cascaded && groupConversions.isEmpty();
-	}
-
-	private static <T> List<T> copyOf(List<T> values) {
-		return (values == null) ? List.of() : List.copyOf(values);
 	}
 }
