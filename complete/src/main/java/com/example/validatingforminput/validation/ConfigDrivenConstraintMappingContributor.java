@@ -1,8 +1,9 @@
 package com.example.validatingforminput.validation;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 
 import org.hibernate.validator.cfg.ConstraintDef;
 import org.hibernate.validator.cfg.ConstraintMapping;
@@ -16,52 +17,60 @@ import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
+import org.springframework.core.annotation.AnnotationAwareOrderComparator;
 
 import jakarta.validation.constraints.Pattern;
 
 public class ConfigDrivenConstraintMappingContributor implements ConstraintMappingContributor {
 
-	private final ValidationProperties validationProperties;
-
 	private final ConstraintMergeService constraintMergeService;
 
-	private final java.util.List<ResolvedClassMapping> resolvedClassMappings;
+	private final List<ResolvedClassMapping> resolvedClassMappings;
+
+	private final List<FieldConstraintContributor> fieldConstraintContributors;
 
 	public ConfigDrivenConstraintMappingContributor(
-		ValidationProperties validationProperties,
+		List<FieldConstraintContributor> fieldConstraintContributors,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
 		ConstraintMergeService constraintMergeService
 	) {
-		this.validationProperties = validationProperties;
+		List<FieldConstraintContributor> orderedContributors = new ArrayList<>(fieldConstraintContributors);
+		AnnotationAwareOrderComparator.sort(orderedContributors);
+		this.fieldConstraintContributors = List.copyOf(orderedContributors);
 		this.constraintMergeService = constraintMergeService;
 		this.resolvedClassMappings = generatedClassMetadataCache.getResolvedMappings();
 	}
 
 	@Override
 	public void createConstraintMappings(ConstraintMappingBuilder builder) {
-		Map<String, ValidationProperties.ClassMapping> configuredClasses = indexByClass(validationProperties);
-
 		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
 			ConstraintMapping constraintMapping = builder.addConstraintMapping();
 			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
 
-			Map<String, ValidationProperties.FieldMapping> configuredFields =
-				indexByField(configuredClasses.get(resolvedClassMapping.className()));
-
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
-				ValidationProperties.FieldMapping configuredField = configuredFields.get(resolvedFieldMapping.fieldName());
-				ValidationProperties.Constraints configuredConstraints =
-					(configuredField == null) ? null : configuredField.getConstraints();
-
 				EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
 					resolvedFieldMapping.baselineConstraints(),
-					configuredConstraints,
+					contributedConstraints(
+						resolvedClassMapping.className(),
+						resolvedFieldMapping.fieldName(),
+						resolvedFieldMapping.baselineConstraints()),
 					resolvedClassMapping.className(),
 					resolvedFieldMapping.fieldName());
 
 				applyConstraints(typeContext, resolvedFieldMapping.fieldName(), effectiveConstraints);
 			}
 		}
+	}
+
+	private List<ValidationProperties.Constraints> contributedConstraints(
+		String className,
+		String fieldName,
+		BaselineFieldConstraints baseline
+	) {
+		return fieldConstraintContributors.stream()
+			.map(contributor -> contributor.contribute(className, fieldName, baseline))
+			.flatMap(Optional::stream)
+			.toList();
 	}
 
 	private void applyConstraints(
@@ -143,28 +152,5 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 		String message
 	) {
 		propertyContext.constraint((message == null) ? constraintDefinition : constraintDefinition.message(message));
-	}
-
-	private Map<String, ValidationProperties.ClassMapping> indexByClass(ValidationProperties properties) {
-		Map<String, ValidationProperties.ClassMapping> classIndex = new HashMap<>();
-		for (ValidationProperties.ClassMapping classMapping : properties.getBusinessValidationOverride()) {
-			if (classMapping != null && classMapping.getFullClassName() != null) {
-				classIndex.put(classMapping.getFullClassName(), classMapping);
-			}
-		}
-		return classIndex;
-	}
-
-	private Map<String, ValidationProperties.FieldMapping> indexByField(ValidationProperties.ClassMapping classMapping) {
-		Map<String, ValidationProperties.FieldMapping> fieldIndex = new HashMap<>();
-		if (classMapping == null) {
-			return fieldIndex;
-		}
-		for (ValidationProperties.FieldMapping fieldMapping : classMapping.getFields()) {
-			if (fieldMapping != null && fieldMapping.getFieldName() != null) {
-				fieldIndex.put(fieldMapping.getFieldName(), fieldMapping);
-			}
-		}
-		return fieldIndex;
 	}
 }

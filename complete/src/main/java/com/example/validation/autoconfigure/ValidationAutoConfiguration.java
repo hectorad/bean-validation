@@ -2,15 +2,18 @@ package com.example.validation.autoconfigure;
 
 import com.example.validatingforminput.validation.ConfigDrivenConstraintMappingContributor;
 import com.example.validatingforminput.validation.ConstraintMergeService;
+import com.example.validatingforminput.validation.FieldConstraintContributor;
 import com.example.validatingforminput.validation.GeneratedClassMetadataCache;
+import com.example.validatingforminput.validation.PropertiesFieldConstraintContributor;
 import com.example.validatingforminput.validation.ValidationProperties;
 import org.hibernate.validator.HibernateValidatorConfiguration;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.validation.ValidationConfigurationCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
+import org.springframework.core.annotation.Order;
+
+import java.util.List;
 
 @AutoConfiguration
 //@ConditionalOnClass({ ValidationConfigurationCustomizer.class, HibernateValidatorConfiguration.class })
@@ -32,14 +35,20 @@ public class ValidationAutoConfiguration {
 	@Bean
 //	@ConditionalOnMissingBean
 	public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
-		ValidationProperties validationProperties,
+		List<FieldConstraintContributor> fieldConstraintContributors,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
 		ConstraintMergeService constraintMergeService
 	) {
 		return new ConfigDrivenConstraintMappingContributor(
-			validationProperties,
+			fieldConstraintContributors,
 			generatedClassMetadataCache,
 			constraintMergeService);
+	}
+
+	@Bean
+	@Order(0)
+	public FieldConstraintContributor propertiesFieldConstraintContributor(ValidationProperties validationProperties) {
+		return new PropertiesFieldConstraintContributor(validationProperties);
 	}
 
 	@Bean

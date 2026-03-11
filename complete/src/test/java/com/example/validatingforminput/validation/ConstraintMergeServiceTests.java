@@ -385,6 +385,115 @@ class ConstraintMergeServiceTests {
 			.hasMessageContaining("NOT_A_REAL_FLAG");
 	}
 
+	@Test
+	void shouldMergeMultipleConstraintSourcesUsingStrictestValues() {
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false,
+			false,
+			NumericBound.inclusive(18L),
+			NumericBound.inclusive(60L),
+			2,
+			30,
+			List.of());
+
+		ValidationProperties.Constraints first = new ValidationProperties.Constraints();
+		first.getMin().setValue(20L);
+		first.getMin().setMessage("Min from first");
+		first.getMax().setValue(59L);
+		first.getMax().setMessage("Max from first");
+		first.getSize().getMin().setValue(4L);
+		first.getSize().getMin().setMessage("Size min from first");
+		first.getSize().getMax().setValue(35L);
+
+		ValidationProperties.Constraints second = new ValidationProperties.Constraints();
+		second.getDecimalMin().setHardValue(new BigDecimal("21.5"));
+		second.getDecimalMin().setHardInclusive(false);
+		second.getDecimalMin().setMessage("Min from second");
+		second.getMax().setHardValue(55L);
+		second.getMax().setMessage("Max from second");
+		second.getSize().getMin().setHardValue(5L);
+		second.getSize().getMin().setMessage("Size min from second");
+
+		EffectiveFieldConstraints effective = mergeService.merge(
+			baseline,
+			List.of(first, second),
+			"AnyClass",
+			"anyField");
+
+		assertBound(effective.min(), "21.5", false);
+		assertThat(effective.minMessage()).isEqualTo("Min from second");
+		assertBound(effective.max(), "55", true);
+		assertThat(effective.maxMessage()).isEqualTo("Max from second");
+		assertThat(effective.sizeMin()).isEqualTo(5);
+		assertThat(effective.sizeMinMessage()).isEqualTo("Size min from second");
+		assertThat(effective.sizeMax()).isEqualTo(30);
+		assertThat(effective.sizeMaxMessage()).isNull();
+	}
+
+	@Test
+	void shouldKeepFirstContributorMessageWhenStrictnessTies() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+
+		ValidationProperties.Constraints first = new ValidationProperties.Constraints();
+		first.getMin().setValue(25L);
+		first.getMin().setMessage("First message");
+
+		ValidationProperties.Constraints second = new ValidationProperties.Constraints();
+		second.getMin().setHardValue(25L);
+		second.getMin().setMessage("Second message");
+
+		EffectiveFieldConstraints effective = mergeService.merge(
+			baseline,
+			List.of(first, second),
+			"AnyClass",
+			"anyField");
+
+		assertBound(effective.min(), "25", true);
+		assertThat(effective.minMessage()).isEqualTo("First message");
+	}
+
+	@Test
+	void shouldAllowLaterHardBoundToWinWhenItIsStricter() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+
+		ValidationProperties.Constraints first = new ValidationProperties.Constraints();
+		first.getMin().setValue(25L);
+		first.getMin().setMessage("First message");
+
+		ValidationProperties.Constraints second = new ValidationProperties.Constraints();
+		second.getDecimalMin().setHardValue(new BigDecimal("25.5"));
+		second.getDecimalMin().setHardInclusive(false);
+		second.getDecimalMin().setMessage("Second message");
+
+		EffectiveFieldConstraints effective = mergeService.merge(
+			baseline,
+			List.of(first, second),
+			"AnyClass",
+			"anyField");
+
+		assertBound(effective.min(), "25.5", false);
+		assertThat(effective.minMessage()).isEqualTo("Second message");
+	}
+
+	@Test
+	void shouldFailWhenMultiSourceEffectiveMinIsGreaterThanEffectiveMax() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+
+		ValidationProperties.Constraints first = new ValidationProperties.Constraints();
+		first.getMin().setValue(70L);
+
+		ValidationProperties.Constraints second = new ValidationProperties.Constraints();
+		second.getMax().setValue(50L);
+
+		assertThatThrownBy(() -> mergeService.merge(
+			baseline,
+			List.of(first, second),
+			"AnyClass",
+			"anyField"))
+			.isInstanceOf(InvalidConstraintConfigurationException.class)
+			.hasMessageContaining("effectiveMin > effectiveMax");
+	}
+
 	private void assertBound(NumericBound bound, String expectedValue, boolean expectedInclusive) {
 		assertThat(bound).isNotNull();
 		assertThat(bound.value()).isEqualByComparingTo(new BigDecimal(expectedValue));

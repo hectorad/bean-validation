@@ -21,6 +21,7 @@ class ValidationAutoConfigurationDiscoveryTests {
 			assertThat(context.getBean("configDrivenValidationConfigurationCustomizer", ValidationConfigurationCustomizer.class))
 				.isNotNull();
 			assertThat(context.getBeansOfType(ConfigDrivenConstraintMappingContributor.class)).hasSize(1);
+			assertThat(context.getBeansOfType(FieldConstraintContributor.class)).hasSize(1);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).hasSize(1);
 			assertThat(context.containsBean("personValidationService")).isFalse();

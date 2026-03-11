@@ -6,11 +6,13 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
 import java.util.function.BinaryOperator;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
+
 public class ConstraintMergeService {
 
 	public EffectiveFieldConstraints merge(
@@ -19,41 +21,84 @@ public class ConstraintMergeService {
 		String className,
 		String fieldName
 	) {
-		ValidationProperties.Constraints effectiveConfig = defaultConstraints(configuredConstraints);
-		BooleanConstraintState notNull = resolveBooleanConstraint(baseline.notNull(), effectiveConfig.getNotNull());
-		BooleanConstraintState notBlank = resolveBooleanConstraint(baseline.notBlank(), effectiveConfig.getNotBlank());
-		BoundCandidate minCandidate = resolveBound(
-			baseline.min(),
-			effectiveConfig.getMin(),
-			effectiveConfig.getDecimalMin(),
+		return merge(
+			baseline,
+			(configuredConstraints == null) ? List.of() : List.of(configuredConstraints),
 			className,
-			fieldName,
-			"decimal-min",
-			NumericBound::stricterLower);
-		BoundCandidate maxCandidate = resolveBound(
-			baseline.max(),
-			effectiveConfig.getMax(),
-			effectiveConfig.getDecimalMax(),
-			className,
-			fieldName,
-			"decimal-max",
-			NumericBound::stricterUpper);
-		SizeBoundCandidate sizeMinCandidate = resolveSizeBound(
-			baseline.sizeMin(),
-			effectiveConfig.getSize().getMin(),
-			className,
-			fieldName,
-			"size.min.value",
-			"size.min.hardValue",
-			true);
-		SizeBoundCandidate sizeMaxCandidate = resolveSizeBound(
-			baseline.sizeMax(),
-			effectiveConfig.getSize().getMax(),
-			className,
-			fieldName,
-			"size.max.value",
-			"size.max.hardValue",
-			false);
+			fieldName);
+	}
+
+	public EffectiveFieldConstraints merge(
+		BaselineFieldConstraints baseline,
+		Iterable<ValidationProperties.Constraints> configuredConstraints,
+		String className,
+		String fieldName
+	) {
+		BooleanConstraintState notNull = baselineBooleanState(baseline.notNull());
+		BooleanConstraintState notBlank = baselineBooleanState(baseline.notBlank());
+		BoundCandidate minCandidate = baselineCandidate(baseline.min());
+		BoundCandidate maxCandidate = baselineCandidate(baseline.max());
+		SizeBoundCandidate sizeMinCandidate = sizeCandidate(baseline.sizeMin());
+		SizeBoundCandidate sizeMaxCandidate = sizeCandidate(baseline.sizeMax());
+
+		List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
+		List<ExtensionRegexRule> extensionRules = new ArrayList<>();
+
+		for (ValidationProperties.Constraints configuredConstraint : defaultConstraints(configuredConstraints)) {
+			ValidationProperties.Constraints effectiveConfig =
+				defaultIfNull(configuredConstraint, ValidationProperties.Constraints::new);
+			notNull = resolveBooleanConstraint(notNull, effectiveConfig.getNotNull());
+			notBlank = resolveBooleanConstraint(notBlank, effectiveConfig.getNotBlank());
+			minCandidate = resolveBound(
+				minCandidate,
+				effectiveConfig.getMin(),
+				effectiveConfig.getDecimalMin(),
+				className,
+				fieldName,
+				"decimal-min",
+				NumericBound::stricterLower);
+			maxCandidate = resolveBound(
+				maxCandidate,
+				effectiveConfig.getMax(),
+				effectiveConfig.getDecimalMax(),
+				className,
+				fieldName,
+				"decimal-max",
+				NumericBound::stricterUpper);
+			ValidationProperties.SizeConstraint sizeConstraint =
+				defaultIfNull(effectiveConfig.getSize(), ValidationProperties.SizeConstraint::new);
+			sizeMinCandidate = resolveSizeBound(
+				sizeMinCandidate,
+				sizeConstraint.getMin(),
+				className,
+				fieldName,
+				"size.min.value",
+				"size.min.hardValue",
+				true);
+			sizeMaxCandidate = resolveSizeBound(
+				sizeMaxCandidate,
+				sizeConstraint.getMax(),
+				className,
+				fieldName,
+				"size.max.value",
+				"size.max.hardValue",
+				false);
+
+			ValidationProperties.PatternConstraint patternConstraint =
+				defaultIfNull(effectiveConfig.getPattern(), ValidationProperties.PatternConstraint::new);
+			appendConfiguredPatterns(
+				patterns,
+				patternConstraint.getRegexes(),
+				patternConstraint.getFlags(),
+				patternConstraint.getMessage(),
+				className,
+				fieldName);
+			extensionRules.addAll(
+				toConfiguredExtensionRules(
+					defaultIfNull(effectiveConfig.getExtensions(), ValidationProperties.ExtensionsConstraint::new).getRules(),
+					className,
+					fieldName));
+		}
 
 		NumericBound min = bound(minCandidate);
 		NumericBound max = bound(maxCandidate);
@@ -66,17 +111,6 @@ public class ConstraintMergeService {
 				"Invalid size constraints. effectiveSizeMin > effectiveSizeMax for class="
 					+ className + ", field=" + fieldName + ", effectiveSizeMin=" + sizeMin + ", effectiveSizeMax=" + sizeMax);
 		}
-
-		List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
-		appendConfiguredPatterns(
-			patterns,
-			effectiveConfig.getPattern().getRegexes(),
-			effectiveConfig.getPattern().getFlags(),
-			effectiveConfig.getPattern().getMessage(),
-			className,
-			fieldName);
-		List<ExtensionRegexRule> extensionRules =
-			toConfiguredExtensionRules(effectiveConfig.getExtensions().getRules(), className, fieldName);
 
 		return new EffectiveFieldConstraints(
 			notNull.enabled(),
@@ -95,26 +129,42 @@ public class ConstraintMergeService {
 			extensionRules);
 	}
 
-	private ValidationProperties.Constraints defaultConstraints(ValidationProperties.Constraints configuredConstraints) {
-		return (configuredConstraints == null) ? new ValidationProperties.Constraints() : configuredConstraints;
+	private Iterable<ValidationProperties.Constraints> defaultConstraints(
+		Iterable<ValidationProperties.Constraints> configuredConstraints
+	) {
+		return (configuredConstraints == null) ? List.of() : configuredConstraints;
+	}
+
+	private <T> T defaultIfNull(T value, Supplier<T> factory) {
+		return (value != null) ? value : factory.get();
 	}
 
 	private boolean isTrue(Boolean value) {
 		return Boolean.TRUE.equals(value);
 	}
 
+	private BooleanConstraintState baselineBooleanState(boolean baselineEnabled) {
+		return new BooleanConstraintState(baselineEnabled, null);
+	}
+
 	private BooleanConstraintState resolveBooleanConstraint(
-		boolean baselineEnabled,
+		BooleanConstraintState current,
 		ValidationProperties.ToggleConstraint configuredConstraint
 	) {
-		boolean configuredEnabled = isTrue(configuredConstraint.getValue()) || isTrue(configuredConstraint.getHardValue());
-		return new BooleanConstraintState(
-			baselineEnabled || configuredEnabled,
-			configuredEnabled ? configuredConstraint.getMessage() : null);
+		ValidationProperties.ToggleConstraint effectiveConstraint =
+			defaultIfNull(configuredConstraint, ValidationProperties.ToggleConstraint::new);
+		boolean configuredEnabled = isTrue(effectiveConstraint.getValue()) || isTrue(effectiveConstraint.getHardValue());
+		if (!configuredEnabled) {
+			return current;
+		}
+		if (!current.enabled() || current.message() == null) {
+			return new BooleanConstraintState(true, effectiveConstraint.getMessage());
+		}
+		return current;
 	}
 
 	private BoundCandidate resolveBound(
-		NumericBound baseline,
+		BoundCandidate current,
 		ValidationProperties.NumericConstraint numericConstraint,
 		ValidationProperties.DecimalConstraint decimalConstraint,
 		String className,
@@ -122,23 +172,27 @@ public class ConstraintMergeService {
 		String decimalPropertyPrefix,
 		BinaryOperator<NumericBound> numericSelector
 	) {
+		ValidationProperties.NumericConstraint effectiveNumericConstraint =
+			defaultIfNull(numericConstraint, ValidationProperties.NumericConstraint::new);
+		ValidationProperties.DecimalConstraint effectiveDecimalConstraint =
+			defaultIfNull(decimalConstraint, ValidationProperties.DecimalConstraint::new);
 		return strictestBound(
 			numericSelector,
-			baselineCandidate(baseline),
-			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
-			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
+			current,
+			toInclusiveBound(effectiveNumericConstraint.getValue(), effectiveNumericConstraint.getMessage()),
+			toInclusiveBound(effectiveNumericConstraint.getHardValue(), effectiveNumericConstraint.getMessage()),
 			toDecimalBound(
-				decimalConstraint.getValue(),
-				decimalConstraint.getInclusive(),
-				decimalConstraint.getMessage(),
+				effectiveDecimalConstraint.getValue(),
+				effectiveDecimalConstraint.getInclusive(),
+				effectiveDecimalConstraint.getMessage(),
 				className,
 				fieldName,
 				decimalPropertyPrefix + ".value",
 				decimalPropertyPrefix + ".inclusive"),
 			toDecimalBound(
-				decimalConstraint.getHardValue(),
-				decimalConstraint.getHardInclusive(),
-				decimalConstraint.getMessage(),
+				effectiveDecimalConstraint.getHardValue(),
+				effectiveDecimalConstraint.getHardInclusive(),
+				effectiveDecimalConstraint.getMessage(),
 				className,
 				fieldName,
 				decimalPropertyPrefix + ".hard-value",
@@ -146,7 +200,7 @@ public class ConstraintMergeService {
 	}
 
 	private SizeBoundCandidate resolveSizeBound(
-		Integer baseline,
+		SizeBoundCandidate current,
 		ValidationProperties.NumericConstraint configuredConstraint,
 		String className,
 		String fieldName,
@@ -154,18 +208,20 @@ public class ConstraintMergeService {
 		String hardValueProperty,
 		boolean selectStricterLower
 	) {
+		ValidationProperties.NumericConstraint effectiveConstraint =
+			defaultIfNull(configuredConstraint, ValidationProperties.NumericConstraint::new);
 		return strictestSizeBound(
 			selectStricterLower,
-			sizeCandidate(baseline),
+			current,
 			toSizeBound(
-				configuredConstraint.getValue(),
-				configuredConstraint.getMessage(),
+				effectiveConstraint.getValue(),
+				effectiveConstraint.getMessage(),
 				className,
 				fieldName,
 				valueProperty),
 			toSizeBound(
-				configuredConstraint.getHardValue(),
-				configuredConstraint.getMessage(),
+				effectiveConstraint.getHardValue(),
+				effectiveConstraint.getMessage(),
 				className,
 				fieldName,
 				hardValueProperty));
@@ -273,10 +329,18 @@ public class ConstraintMergeService {
 		String className,
 		String fieldName
 	) {
+		List<String> effectiveRegexes = (configuredRegexes == null) ? List.of() : configuredRegexes;
 		Set<jakarta.validation.constraints.Pattern.Flag> parsedFlags =
-			parsePatternFlags(configuredFlags, className, fieldName);
-		for (int index = 0; index < configuredRegexes.size(); index++) {
-			patterns.add(toConfiguredPatternRule(configuredRegexes.get(index), parsedFlags, configuredMessage, className, fieldName, index));
+			parsePatternFlags((configuredFlags == null) ? List.of() : configuredFlags, className, fieldName);
+		for (int index = 0; index < effectiveRegexes.size(); index++) {
+			patterns.add(
+				toConfiguredPatternRule(
+					effectiveRegexes.get(index),
+					parsedFlags,
+					configuredMessage,
+					className,
+					fieldName,
+					index));
 		}
 	}
 
