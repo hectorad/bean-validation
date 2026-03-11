@@ -228,6 +228,46 @@ class ConstraintMergeServiceTests {
 	}
 
 	@Test
+	void shouldDeduplicateConfiguredPatternThatMatchesBaselineIdentity() {
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false,
+			false,
+			null,
+			null,
+			null,
+			null,
+			List.of(new PatternRule("^[A-Za-z]+$", java.util.EnumSet.of(Pattern.Flag.CASE_INSENSITIVE)))
+		);
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of("^[A-Za-z]+$"));
+		constraints.getPattern().setFlags(List.of("CASE_INSENSITIVE"));
+		constraints.getPattern().setMessage("Letters only");
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
+
+		assertThat(effective.patterns()).singleElement().satisfies(patternRule -> {
+			assertThat(patternRule.regex()).isEqualTo("^[A-Za-z]+$");
+			assertThat(patternRule.flags()).containsExactly(Pattern.Flag.CASE_INSENSITIVE);
+			assertThat(patternRule.message()).isEqualTo("Letters only");
+		});
+	}
+
+	@Test
+	void shouldDeduplicateRepeatedConfiguredPatternsWithSameIdentity() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
+		constraints.getPattern().setRegexes(List.of("^[A-Za-z]+$", "^[A-Za-z]+$"));
+		constraints.getPattern().setMessage("Letters only");
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
+
+		assertThat(effective.patterns()).singleElement().satisfies(patternRule -> {
+			assertThat(patternRule.regex()).isEqualTo("^[A-Za-z]+$");
+			assertThat(patternRule.message()).isEqualTo("Letters only");
+		});
+	}
+
+	@Test
 	void shouldFailWhenEqualBoundsBecomeExclusive() {
 		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();

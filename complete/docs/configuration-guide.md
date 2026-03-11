@@ -45,7 +45,7 @@ This framework provides a config-driven validation override system built on Jaka
 
 | Dependency | Version | Notes |
 |---|---|---|
-| Java | 21+ | Required language level |
+| Java | 21 | Required toolchain baseline |
 | Spring Boot | 3.5.x | `spring-boot-starter-validation` required |
 | Hibernate Validator | (transitive) | Included via `spring-boot-starter-validation` |
 | JSONPath | (optional) | `com.jayway.jsonpath:json-path`, only needed for `extensions` constraint |
@@ -77,7 +77,9 @@ implementation 'org.springframework.boot:spring-boot-starter-web'
 implementation 'com.jayway.jsonpath:json-path'
 ```
 
-**Auto-configuration:** The framework registers itself via Spring Boot's `AutoConfiguration.imports` mechanism. No `@Import` or `@ComponentScan` is needed.
+**Build and verification:** Maven is the authoritative build. Run `./mvnw test` for canonical verification. Gradle remains supported with the same Java 21 toolchain baseline via `./gradlew test`.
+
+**Auto-configuration:** The framework registers itself via Spring Boot's `AutoConfiguration.imports` mechanism. No `@Import` or `@ComponentScan` is needed. Default beans back off when the application provides replacements, and the customizer only activates when Hibernate Validator is available.
 
 ---
 
@@ -344,7 +346,7 @@ pattern:
 
 **Restriction:** Only valid on `CharSequence` (String) fields.
 
-**Merge rule:** Patterns are cumulative. Configured patterns are appended to baseline `@Pattern` annotations. The field value must satisfy every pattern (AND semantics).
+**Merge rule:** Patterns are cumulative. Distinct `regex + flags` combinations are all enforced (AND semantics), but duplicate identities are collapsed into one effective rule. If configuration repeats a baseline-equivalent pattern and provides a message, that message becomes the effective message for the single surviving rule.
 
 ---
 
@@ -368,7 +370,7 @@ extensions:
       message: Vendor extension code format is invalid
 ```
 
-**Restriction:** The field must be named `extensions`. The field type must be `Map`, `Collection`, array, or `CharSequence`.
+**Restriction:** The field type must be `Map`, `Collection`, array, or `CharSequence`.
 
 See [Extensions Validation](#extensions-validation) for runtime behavior details.
 
@@ -388,7 +390,7 @@ The framework merges baseline constraints (from annotations) with configured con
 | `size.min` | Higher value wins | `@Size(min=3)` + config `5` = 5 |
 | `size.max` | Lower value wins | `@Size(max=30)` + config `25` = 25 |
 | Equal numeric bounds | Exclusive beats inclusive | Both at `10`: exclusive wins over inclusive |
-| `pattern` | Cumulative (all must match) | Baseline + config patterns both enforced |
+| `pattern` | Cumulative by identity (all distinct rules must match) | Baseline + config patterns both enforced; duplicate `regex + flags` rules collapse |
 | `extensions` | Additive across contributors | Rules from all sources are combined |
 
 ### Walkthrough Example
@@ -474,8 +476,7 @@ The `extensions` constraint validates entries in a `Map<String, Object>` field u
 
 ### Restrictions
 
-- The target field must be named `extensions` (enforced at startup).
-- The field type must be `Map`, `Collection`, array, or `CharSequence`.
+- The target field type must be `Map`, `Collection`, array, or `CharSequence`.
 
 ### Runtime Behavior
 
@@ -690,7 +691,6 @@ Spring validates `ValidationProperties` on binding:
 | `Constraint numeric bounds is not supported for...` | Numeric constraint on an unsupported type (e.g., `Boolean`, `Double`) |
 | `Constraint size is not supported for...` | `size` on a non-container field |
 | `Constraint pattern is not supported for...` | `pattern` on a non-String field |
-| `Constraint extensions can only be configured for...field=extensions` | `extensions` on a field not named `extensions` |
 
 ### Merge-Time Errors
 

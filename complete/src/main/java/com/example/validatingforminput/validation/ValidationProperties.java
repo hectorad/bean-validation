@@ -23,7 +23,7 @@ public class ValidationProperties {
     }
 
     public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
-        this.businessValidationOverride = (businessValidationOverride == null) ? new ArrayList<>() : businessValidationOverride;
+        this.businessValidationOverride = copyList(businessValidationOverride);
     }
 
     public static class ClassMapping {
@@ -48,7 +48,7 @@ public class ValidationProperties {
         }
 
         public void setFields(List<FieldMapping> fields) {
-            this.fields = (fields == null) ? new ArrayList<>() : fields;
+            this.fields = copyList(fields);
         }
     }
 
@@ -73,7 +73,7 @@ public class ValidationProperties {
         }
 
         public void setConstraints(Constraints constraints) {
-            this.constraints = (constraints == null) ? new Constraints() : constraints;
+            this.constraints = defaultValue(constraints, Constraints::new);
         }
     }
 
@@ -111,7 +111,7 @@ public class ValidationProperties {
         }
 
         public void setNotNull(ToggleConstraint notNull) {
-            this.notNull = (notNull == null) ? new ToggleConstraint() : notNull;
+            this.notNull = defaultValue(notNull, ToggleConstraint::new);
         }
 
         public ToggleConstraint getNotBlank() {
@@ -119,7 +119,7 @@ public class ValidationProperties {
         }
 
         public void setNotBlank(ToggleConstraint notBlank) {
-            this.notBlank = (notBlank == null) ? new ToggleConstraint() : notBlank;
+            this.notBlank = defaultValue(notBlank, ToggleConstraint::new);
         }
 
         public NumericConstraint getMin() {
@@ -127,7 +127,7 @@ public class ValidationProperties {
         }
 
         public void setMin(NumericConstraint min) {
-            this.min = (min == null) ? new NumericConstraint() : min;
+            this.min = defaultValue(min, NumericConstraint::new);
         }
 
         public NumericConstraint getMax() {
@@ -135,7 +135,7 @@ public class ValidationProperties {
         }
 
         public void setMax(NumericConstraint max) {
-            this.max = (max == null) ? new NumericConstraint() : max;
+            this.max = defaultValue(max, NumericConstraint::new);
         }
 
         public DecimalConstraint getDecimalMin() {
@@ -143,7 +143,7 @@ public class ValidationProperties {
         }
 
         public void setDecimalMin(DecimalConstraint decimalMin) {
-            this.decimalMin = (decimalMin == null) ? new DecimalConstraint() : decimalMin;
+            this.decimalMin = defaultValue(decimalMin, DecimalConstraint::new);
         }
 
         public DecimalConstraint getDecimalMax() {
@@ -151,7 +151,7 @@ public class ValidationProperties {
         }
 
         public void setDecimalMax(DecimalConstraint decimalMax) {
-            this.decimalMax = (decimalMax == null) ? new DecimalConstraint() : decimalMax;
+            this.decimalMax = defaultValue(decimalMax, DecimalConstraint::new);
         }
 
         public SizeConstraint getSize() {
@@ -159,7 +159,7 @@ public class ValidationProperties {
         }
 
         public void setSize(SizeConstraint size) {
-            this.size = (size == null) ? new SizeConstraint() : size;
+            this.size = defaultValue(size, SizeConstraint::new);
         }
 
         public PatternConstraint getPattern() {
@@ -167,7 +167,7 @@ public class ValidationProperties {
         }
 
         public void setPattern(PatternConstraint pattern) {
-            this.pattern = (pattern == null) ? new PatternConstraint() : pattern;
+            this.pattern = defaultValue(pattern, PatternConstraint::new);
         }
 
         public ExtensionsConstraint getExtensions() {
@@ -175,7 +175,7 @@ public class ValidationProperties {
         }
 
         public void setExtensions(ExtensionsConstraint extensions) {
-            this.extensions = (extensions == null) ? new ExtensionsConstraint() : extensions;
+            this.extensions = defaultValue(extensions, ExtensionsConstraint::new);
         }
     }
 
@@ -311,7 +311,7 @@ public class ValidationProperties {
         }
 
         public void setMin(NumericConstraint min) {
-            this.min = (min == null) ? new NumericConstraint() : min;
+            this.min = defaultValue(min, NumericConstraint::new);
         }
 
         public NumericConstraint getMax() {
@@ -319,7 +319,7 @@ public class ValidationProperties {
         }
 
         public void setMax(NumericConstraint max) {
-            this.max = (max == null) ? new NumericConstraint() : max;
+            this.max = defaultValue(max, NumericConstraint::new);
         }
     }
 
@@ -336,7 +336,7 @@ public class ValidationProperties {
         }
 
         public void setRegexes(List<String> regexes) {
-            this.regexes = (regexes == null) ? new ArrayList<>() : regexes;
+            this.regexes = copyList(regexes);
         }
 
         public List<String> getFlags() {
@@ -344,7 +344,7 @@ public class ValidationProperties {
         }
 
         public void setFlags(List<String> flags) {
-            this.flags = (flags == null) ? new ArrayList<>() : flags;
+            this.flags = copyList(flags);
         }
 
         public String getMessage() {
@@ -366,7 +366,7 @@ public class ValidationProperties {
         }
 
         public void setRules(List<ExtensionRuleConstraint> rules) {
-            this.rules = (rules == null) ? new ArrayList<>() : rules;
+            this.rules = copyList(rules);
         }
     }
 
@@ -411,5 +411,13 @@ public class ValidationProperties {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static <T> List<T> copyList(List<T> values) {
+        return (values == null) ? new ArrayList<>() : new ArrayList<>(values);
+    }
+
+    private static <T> T defaultValue(T value, java.util.function.Supplier<T> defaultSupplier) {
+        return (value == null) ? defaultSupplier.get() : value;
     }
 }

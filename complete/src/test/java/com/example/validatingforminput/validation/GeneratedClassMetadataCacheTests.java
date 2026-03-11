@@ -117,7 +117,7 @@ class GeneratedClassMetadataCacheTests {
 	}
 
 	@Test
-	void shouldFailWhenExtensionsRuleIsConfiguredForFieldOtherThanExtensions() {
+	void shouldAllowExtensionsRuleOnAnySupportedFieldName() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(NonExtensionsMapTarget.class.getName());
@@ -132,9 +132,12 @@ class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("field=extensions");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getRequiredResolvedMapping(NonExtensionsMapTarget.class.getName()).fields())
+			.singleElement()
+			.extracting(ResolvedFieldMapping::fieldName)
+			.isEqualTo("metadata");
 	}
 
 	@Test

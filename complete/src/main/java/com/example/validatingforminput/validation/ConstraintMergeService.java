@@ -4,6 +4,9 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.regex.Pattern;
@@ -275,9 +278,33 @@ public class ConstraintMergeService {
 	) {
 		Set<jakarta.validation.constraints.Pattern.Flag> parsedFlags =
 			parsePatternFlags(configuredFlags, className, fieldName);
+		Map<PatternIdentity, Integer> patternIndexes = indexPatterns(patterns);
 		for (int index = 0; index < configuredRegexes.size(); index++) {
-			patterns.add(toConfiguredPatternRule(configuredRegexes.get(index), parsedFlags, configuredMessage, className, fieldName, index));
+			PatternRule configuredPattern =
+				toConfiguredPatternRule(configuredRegexes.get(index), parsedFlags, configuredMessage, className, fieldName, index);
+			PatternIdentity patternIdentity = new PatternIdentity(configuredPattern.regex(), configuredPattern.flags());
+			Integer existingIndex = patternIndexes.get(patternIdentity);
+			if (existingIndex != null) {
+				PatternRule existingPattern = patterns.get(existingIndex);
+				if (configuredPattern.message() != null && !Objects.equals(existingPattern.message(), configuredPattern.message())) {
+					patterns.set(
+						existingIndex,
+						new PatternRule(existingPattern.regex(), existingPattern.flags(), configuredPattern.message()));
+				}
+				continue;
+			}
+			patternIndexes.put(patternIdentity, patterns.size());
+			patterns.add(configuredPattern);
 		}
+	}
+
+	private Map<PatternIdentity, Integer> indexPatterns(List<PatternRule> patterns) {
+		Map<PatternIdentity, Integer> indexes = new LinkedHashMap<>();
+		for (int index = 0; index < patterns.size(); index++) {
+			PatternRule patternRule = patterns.get(index);
+			indexes.putIfAbsent(new PatternIdentity(patternRule.regex(), patternRule.flags()), index);
+		}
+		return indexes;
 	}
 
 	private PatternRule toConfiguredPatternRule(
@@ -457,5 +484,12 @@ public class ConstraintMergeService {
 	}
 
 	private record BooleanConstraintState(boolean enabled, String message) {
+	}
+
+	private record PatternIdentity(String regex, Set<jakarta.validation.constraints.Pattern.Flag> flags) {
+
+		private PatternIdentity {
+			flags = Set.copyOf(flags);
+		}
 	}
 }

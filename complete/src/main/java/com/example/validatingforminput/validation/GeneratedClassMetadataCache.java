@@ -1,7 +1,12 @@
 package com.example.validatingforminput.validation;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedArrayType;
 import java.lang.reflect.AnnotatedElement;
+import java.lang.reflect.AnnotatedParameterizedType;
+import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -9,12 +14,16 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.util.StringUtils;
 
+import jakarta.validation.Constraint;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Max;
@@ -23,8 +32,20 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import jakarta.validation.groups.ConvertGroup;
 
 public class GeneratedClassMetadataCache {
+
+	private static final Set<Class<? extends Annotation>> MODELED_CONSTRAINT_TYPES = Set.of(
+		NotNull.class,
+		NotBlank.class,
+		Min.class,
+		Max.class,
+		DecimalMin.class,
+		DecimalMax.class,
+		Size.class,
+		Pattern.class,
+		ExtensionsJsonPathRegex.class);
 
 	private final Map<String, ResolvedClassMapping> resolvedClassMappingsByName;
 
@@ -64,17 +85,29 @@ public class GeneratedClassMetadataCache {
 					throw new IllegalStateException("Duplicate field mapping found for class " + className + ": " + fieldName);
 				}
 
-				Field field = resolveField(clazz, className, fieldName);
-				BaselineFieldConstraints baseline = extractBaseline(clazz, field, className);
-				validateConstraints(className, field, baseline, fieldMapping.getConstraints());
-				fieldMappingIndex.put(fieldName, new ResolvedFieldMapping(fieldName, baseline));
+				ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(clazz, className, fieldMapping);
+				fieldMappingIndex.put(fieldName, resolvedFieldMapping);
 			}
 
-			mappingIndex.put(className,
+			mappingIndex.put(
+				className,
 				new ResolvedClassMapping(className, clazz, new ArrayList<>(fieldMappingIndex.values())));
 		}
 
 		return Collections.unmodifiableMap(mappingIndex);
+	}
+
+	private ResolvedFieldMapping resolveFieldMapping(
+		Class<?> clazz,
+		String className,
+		ValidationProperties.FieldMapping fieldMapping
+	) {
+		String fieldName = fieldMapping.getFieldName();
+		Field field = resolveField(clazz, className, fieldName);
+		BaselineFieldConstraints baseline = extractBaseline(clazz, field, className);
+		FieldValidationMetadata validationMetadata = extractValidationMetadata(clazz, field);
+		validateConstraints(className, field, baseline, fieldMapping.getConstraints());
+		return new ResolvedFieldMapping(fieldName, baseline, validationMetadata);
 	}
 
 	private String normalizeClassName(ValidationProperties.ClassMapping classMapping) {
@@ -105,8 +138,7 @@ public class GeneratedClassMetadataCache {
 		Class<?> current = clazz;
 		while (current != null && current != Object.class) {
 			try {
-				Field declaredField = current.getDeclaredField(fieldName);
-				return declaredField;
+				return current.getDeclaredField(fieldName);
 			}
 			catch (NoSuchFieldException ignored) {
 				current = current.getSuperclass();
@@ -122,6 +154,119 @@ public class GeneratedClassMetadataCache {
 		findGetter(clazz, field.getName())
 			.ifPresent(method -> collectAnnotationBaseline(method, baselineAccumulator, className, field.getName()));
 		return baselineAccumulator.toBaseline();
+	}
+
+	private FieldValidationMetadata extractValidationMetadata(Class<?> clazz, Field field) {
+		ValidationMetadataAccumulator accumulator = new ValidationMetadataAccumulator();
+		collectValidationMetadata(field, field.getAnnotatedType(), accumulator);
+		findGetter(clazz, field.getName())
+			.ifPresent(method -> collectValidationMetadata(method, method.getAnnotatedReturnType(), accumulator));
+		return accumulator.toMetadata();
+	}
+
+	private void collectValidationMetadata(
+		AnnotatedElement element,
+		AnnotatedType annotatedType,
+		ValidationMetadataAccumulator accumulator
+	) {
+		if (element == null) {
+			return;
+		}
+		accumulator.cascaded |= element.isAnnotationPresent(Valid.class);
+		accumulator.groupConversions.putAll(extractGroupConversions(element.getAnnotationsByType(ConvertGroup.class)));
+		collectPassthroughConstraintAnnotations(element.getAnnotations(), accumulator.constraintAnnotations);
+		collectContainerElementMetadata(annotatedType, List.of(), accumulator);
+	}
+
+	private Map<Class<?>, Class<?>> extractGroupConversions(ConvertGroup[] conversions) {
+		Map<Class<?>, Class<?>> extracted = new LinkedHashMap<>();
+		for (ConvertGroup conversion : conversions) {
+			extracted.putIfAbsent(conversion.from(), conversion.to());
+		}
+		return extracted;
+	}
+
+	private void collectContainerElementMetadata(
+		AnnotatedType annotatedType,
+		List<Integer> path,
+		ValidationMetadataAccumulator accumulator
+	) {
+		if (annotatedType == null || annotatedType instanceof AnnotatedArrayType) {
+			return;
+		}
+		if (!(annotatedType instanceof AnnotatedParameterizedType parameterizedType)) {
+			return;
+		}
+
+		AnnotatedType[] typeArguments = parameterizedType.getAnnotatedActualTypeArguments();
+		for (int index = 0; index < typeArguments.length; index++) {
+			AnnotatedType typeArgument = typeArguments[index];
+			List<Integer> currentPath = appendPath(path, index);
+			ContainerElementMetadataAccumulator containerAccumulator =
+				accumulator.containerElements.computeIfAbsent(currentPath, ignored -> new ContainerElementMetadataAccumulator());
+			containerAccumulator.cascaded |= typeArgument.isAnnotationPresent(Valid.class);
+			containerAccumulator.groupConversions.putAll(extractGroupConversions(typeArgument.getAnnotationsByType(ConvertGroup.class)));
+			collectPassthroughConstraintAnnotations(typeArgument.getAnnotations(), containerAccumulator.constraintAnnotations);
+			collectContainerElementMetadata(typeArgument, currentPath, accumulator);
+		}
+	}
+
+	private List<Integer> appendPath(List<Integer> path, int index) {
+		List<Integer> nestedPath = new ArrayList<>(path.size() + 1);
+		nestedPath.addAll(path);
+		nestedPath.add(index);
+		return List.copyOf(nestedPath);
+	}
+
+	private void collectPassthroughConstraintAnnotations(Annotation[] annotations, Set<Annotation> passthroughAnnotations) {
+		for (Annotation annotation : annotations) {
+			collectPassthroughConstraintAnnotation(annotation, passthroughAnnotations);
+		}
+	}
+
+	private void collectPassthroughConstraintAnnotation(Annotation annotation, Set<Annotation> passthroughAnnotations) {
+		Class<? extends Annotation> annotationType = annotation.annotationType();
+		if (annotationType == Valid.class || annotationType == ConvertGroup.class || annotationType == ConvertGroup.List.class) {
+			return;
+		}
+		if (annotationType.isAnnotationPresent(Constraint.class)) {
+			if (!MODELED_CONSTRAINT_TYPES.contains(annotationType)) {
+				passthroughAnnotations.add(annotation);
+			}
+			return;
+		}
+
+		Method valueMethod = findConstraintContainerValueMethod(annotationType);
+		if (valueMethod == null) {
+			return;
+		}
+		try {
+			for (Annotation nestedAnnotation : (Annotation[]) valueMethod.invoke(annotation)) {
+				collectPassthroughConstraintAnnotation(nestedAnnotation, passthroughAnnotations);
+			}
+		}
+		catch (IllegalAccessException | InvocationTargetException exception) {
+			throw new IllegalStateException(
+				"Unable to inspect container constraint annotation: " + annotationType.getName(),
+				exception);
+		}
+	}
+
+	private Method findConstraintContainerValueMethod(Class<? extends Annotation> annotationType) {
+		try {
+			Method valueMethod = annotationType.getMethod("value");
+			Class<?> returnType = valueMethod.getReturnType();
+			if (!returnType.isArray() || !Annotation.class.isAssignableFrom(returnType.getComponentType())) {
+				return null;
+			}
+			@SuppressWarnings("unchecked")
+			Class<? extends Annotation> nestedAnnotationType =
+				(Class<? extends Annotation>) returnType.getComponentType();
+			return nestedAnnotationType.isAnnotationPresent(Constraint.class) ? valueMethod : null;
+		}
+		catch (NoSuchMethodException exception) {
+			return null;
+		}
 	}
 
 	private void validateConstraints(
@@ -150,11 +295,6 @@ public class GeneratedClassMetadataCache {
 		}
 		if (hasConfiguredPatterns(constraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("pattern", className, fieldName, fieldType);
-		}
-		if (extensionsConfigured && !"extensions".equals(fieldName)) {
-			throw new InvalidConstraintConfigurationException(
-				"Constraint extensions can only be configured for class="
-					+ className + ", field=extensions");
 		}
 		if (extensionsConfigured && !supportsContainerValue(rawFieldType)) {
 			throw unsupportedConstraint("extensions", className, fieldName, rawFieldType);
@@ -207,7 +347,7 @@ public class GeneratedClassMetadataCache {
 		}
 	}
 
-	private java.util.Optional<Method> findGetter(Class<?> clazz, String fieldName) {
+	private Optional<Method> findGetter(Class<?> clazz, String fieldName) {
 		String capitalizedFieldName = StringUtils.capitalize(fieldName);
 		List<String> getterNames = List.of("get" + capitalizedFieldName, "is" + capitalizedFieldName);
 
@@ -217,7 +357,7 @@ public class GeneratedClassMetadataCache {
 				try {
 					Method method = current.getDeclaredMethod(getterName);
 					if (method.getParameterCount() == 0) {
-						return java.util.Optional.of(method);
+						return Optional.of(method);
 					}
 				}
 				catch (NoSuchMethodException ignored) {
@@ -226,7 +366,7 @@ public class GeneratedClassMetadataCache {
 			}
 			current = current.getSuperclass();
 		}
-		return java.util.Optional.empty();
+		return Optional.empty();
 	}
 
 	private NumericBound parseDecimalAnnotationBound(
@@ -371,6 +511,50 @@ public class GeneratedClassMetadataCache {
 
 		private BaselineFieldConstraints toBaseline() {
 			return new BaselineFieldConstraints(notNull, notBlank, min, max, sizeMin, sizeMax, patterns);
+		}
+	}
+
+	private static final class ValidationMetadataAccumulator {
+
+		private final Set<Annotation> constraintAnnotations = new LinkedHashSet<>();
+
+		private boolean cascaded;
+
+		private final Map<Class<?>, Class<?>> groupConversions = new LinkedHashMap<>();
+
+		private final Map<List<Integer>, ContainerElementMetadataAccumulator> containerElements = new LinkedHashMap<>();
+
+		private FieldValidationMetadata toMetadata() {
+			List<ContainerElementValidationMetadata> containerMetadata = containerElements.entrySet().stream()
+				.map(entry -> entry.getValue().toMetadata(entry.getKey()))
+				.filter(containerElementValidationMetadata -> !containerElementValidationMetadata.isEmpty())
+				.toList();
+			return new FieldValidationMetadata(
+				new ArrayList<>(constraintAnnotations),
+				cascaded,
+				groupConversions.entrySet().stream()
+					.map(entry -> new GroupConversionMapping(entry.getKey(), entry.getValue()))
+					.toList(),
+				containerMetadata);
+		}
+	}
+
+	private static final class ContainerElementMetadataAccumulator {
+
+		private final Set<Annotation> constraintAnnotations = new LinkedHashSet<>();
+
+		private boolean cascaded;
+
+		private final Map<Class<?>, Class<?>> groupConversions = new LinkedHashMap<>();
+
+		private ContainerElementValidationMetadata toMetadata(List<Integer> path) {
+			return new ContainerElementValidationMetadata(
+				path,
+				new ArrayList<>(constraintAnnotations),
+				cascaded,
+				groupConversions.entrySet().stream()
+					.map(entry -> new GroupConversionMapping(entry.getKey(), entry.getValue()))
+					.toList());
 		}
 	}
 }

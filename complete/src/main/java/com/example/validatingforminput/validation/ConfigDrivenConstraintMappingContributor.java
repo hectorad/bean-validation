@@ -1,5 +1,9 @@
 package com.example.validatingforminput.validation;
 
+import java.lang.annotation.Annotation;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -7,6 +11,7 @@ import java.util.Objects;
 import org.hibernate.validator.cfg.ConstraintDef;
 import org.hibernate.validator.cfg.ConstraintMapping;
 import org.hibernate.validator.cfg.GenericConstraintDef;
+import org.hibernate.validator.cfg.context.ContainerElementConstraintMappingContext;
 import org.hibernate.validator.cfg.context.PropertyConstraintMappingContext;
 import org.hibernate.validator.cfg.context.TypeConstraintMappingContext;
 import org.hibernate.validator.cfg.defs.DecimalMaxDef;
@@ -17,6 +22,7 @@ import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
 
+import jakarta.validation.Payload;
 import jakarta.validation.constraints.Pattern;
 
 public class ConfigDrivenConstraintMappingContributor implements ConstraintMappingContributor {
@@ -59,17 +65,19 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 					resolvedClassMapping.className(),
 					resolvedFieldMapping.fieldName());
 
-				applyConstraints(typeContext, resolvedFieldMapping.fieldName(), effectiveConstraints);
+				applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
 			}
 		}
 	}
 
 	private void applyConstraints(
 		TypeConstraintMappingContext<?> typeContext,
-		String fieldName,
+		ResolvedFieldMapping resolvedFieldMapping,
 		EffectiveFieldConstraints effectiveConstraints
 	) {
-		PropertyConstraintMappingContext propertyContext = typeContext.field(fieldName).ignoreAnnotations(true);
+		PropertyConstraintMappingContext propertyContext =
+			typeContext.field(resolvedFieldMapping.fieldName()).ignoreAnnotations(true);
+		applyValidationMetadata(propertyContext, resolvedFieldMapping.validationMetadata());
 
 		if (effectiveConstraints.notNull()) {
 			applyConstraint(propertyContext, new NotNullDef(), effectiveConstraints.notNullMessage());
@@ -135,6 +143,118 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 					.param("regex", extensionRule.regex()),
 				extensionRule.message());
 		}
+	}
+
+	private void applyValidationMetadata(
+		PropertyConstraintMappingContext propertyContext,
+		FieldValidationMetadata validationMetadata
+	) {
+		if (validationMetadata == null || validationMetadata.isEmpty()) {
+			return;
+		}
+		applyConstraintAnnotations(propertyContext, validationMetadata.constraintAnnotations());
+		applyCascadeMetadata(propertyContext, validationMetadata.cascaded(), validationMetadata.groupConversions());
+		for (ContainerElementValidationMetadata containerElement : validationMetadata.containerElements()) {
+			applyContainerElementValidationMetadata(propertyContext, containerElement);
+		}
+	}
+
+	private void applyContainerElementValidationMetadata(
+		PropertyConstraintMappingContext propertyContext,
+		ContainerElementValidationMetadata containerElement
+	) {
+		ContainerElementConstraintMappingContext containerContext = propertyContext.containerElementType(
+			containerElement.path().getFirst(),
+			toNestedIndexes(containerElement.path()));
+		applyConstraintAnnotations(containerContext, containerElement.constraintAnnotations());
+		applyCascadeMetadata(containerContext, containerElement.cascaded(), containerElement.groupConversions());
+	}
+
+	private int[] toNestedIndexes(java.util.List<Integer> path) {
+		if (path.size() <= 1) {
+			return new int[0];
+		}
+		return path.subList(1, path.size()).stream().mapToInt(Integer::intValue).toArray();
+	}
+
+	private void applyConstraintAnnotations(
+		org.hibernate.validator.cfg.context.Constrainable<?> constrainable,
+		java.util.List<Annotation> annotations
+	) {
+		for (Annotation annotation : annotations) {
+			constrainable.constraint(toConstraintDefinition(annotation));
+		}
+	}
+
+	private void applyCascadeMetadata(
+		org.hibernate.validator.cfg.context.Cascadable<?> cascadable,
+		boolean cascaded,
+		java.util.List<GroupConversionMapping> groupConversions
+	) {
+		if (cascaded) {
+			cascadable.valid();
+		}
+		for (GroupConversionMapping groupConversion : groupConversions) {
+			cascadable.convertGroup(groupConversion.from()).to(groupConversion.to());
+		}
+	}
+
+	@SuppressWarnings({ "rawtypes", "unchecked" })
+	private ConstraintDef<?, ?> toConstraintDefinition(Annotation annotation) {
+		GenericConstraintDef constraintDefinition = new GenericConstraintDef(annotation.annotationType());
+		for (Method attribute : annotation.annotationType().getDeclaredMethods()) {
+			Object value = readAnnotationAttribute(annotation, attribute);
+			switch (attribute.getName()) {
+				case "message" -> constraintDefinition.message((String) value);
+				case "groups" -> constraintDefinition.groups((Class<?>[]) value);
+				case "payload" -> constraintDefinition.payload((Class<? extends Payload>[]) value);
+				default -> constraintDefinition.param(attribute.getName(), copyAnnotationValue(value));
+			}
+		}
+		return constraintDefinition;
+	}
+
+	private Object readAnnotationAttribute(Annotation annotation, Method attribute) {
+		try {
+			return attribute.invoke(annotation);
+		}
+		catch (IllegalAccessException | InvocationTargetException exception) {
+			throw new IllegalStateException(
+				"Unable to read annotation attribute " + attribute.getName()
+					+ " from " + annotation.annotationType().getName(),
+				exception);
+		}
+	}
+
+	private Object copyAnnotationValue(Object value) {
+		if (value == null || !value.getClass().isArray()) {
+			return value;
+		}
+		if (value instanceof boolean[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof byte[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof short[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof int[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof long[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof float[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof double[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		if (value instanceof char[] values) {
+			return Arrays.copyOf(values, values.length);
+		}
+		return Arrays.copyOf((Object[]) value, ((Object[]) value).length);
 	}
 
 	private <D extends ConstraintDef<D, ?>> void applyConstraint(

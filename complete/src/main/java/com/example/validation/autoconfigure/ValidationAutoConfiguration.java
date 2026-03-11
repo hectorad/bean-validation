@@ -5,6 +5,8 @@ import com.example.validatingforminput.validation.ConstraintMergeService;
 import com.example.validatingforminput.validation.GeneratedClassMetadataCache;
 import com.example.validatingforminput.validation.ValidationProperties;
 import org.hibernate.validator.HibernateValidatorConfiguration;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -13,24 +15,26 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean;
 
 @AutoConfiguration
-//@ConditionalOnClass({ ValidationConfigurationCustomizer.class, HibernateValidatorConfiguration.class })
+@ConditionalOnClass({ ValidationConfigurationCustomizer.class, HibernateValidatorConfiguration.class })
 @EnableConfigurationProperties(ValidationProperties.class)
 public class ValidationAutoConfiguration {
 
+	private static final Logger log = LoggerFactory.getLogger(ValidationAutoConfiguration.class);
+
 	@Bean
-//	@ConditionalOnMissingBean
+	@ConditionalOnMissingBean(ConstraintMergeService.class)
 	public ConstraintMergeService constraintMergeService() {
 		return new ConstraintMergeService();
 	}
 
 	@Bean
-//	@ConditionalOnMissingBean
+	@ConditionalOnMissingBean(GeneratedClassMetadataCache.class)
 	public GeneratedClassMetadataCache generatedClassMetadataCache(ValidationProperties validationProperties) {
 		return new GeneratedClassMetadataCache(validationProperties);
 	}
 
 	@Bean
-//	@ConditionalOnMissingBean
+	@ConditionalOnMissingBean(ConfigDrivenConstraintMappingContributor.class)
 	public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
 		ValidationProperties validationProperties,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
@@ -43,14 +47,19 @@ public class ValidationAutoConfiguration {
 	}
 
 	@Bean
-//	@ConditionalOnMissingBean(name = "configDrivenValidationConfigurationCustomizer")
+	@ConditionalOnMissingBean(name = "configDrivenValidationConfigurationCustomizer")
 	public ValidationConfigurationCustomizer configDrivenValidationConfigurationCustomizer(
 		ConfigDrivenConstraintMappingContributor contributor
 	) {
+		java.util.concurrent.atomic.AtomicBoolean warnedUnsupportedProvider = new java.util.concurrent.atomic.AtomicBoolean();
 		return configuration -> {
 			if (!(configuration instanceof HibernateValidatorConfiguration hibernateConfiguration)) {
-				throw new IllegalStateException(
-					"Hibernate Validator configuration is required for config-driven constraint mapping.");
+				if (warnedUnsupportedProvider.compareAndSet(false, true)) {
+					log.warn(
+						"Skipping config-driven constraint mapping because the active Bean Validation provider is not Hibernate Validator: {}",
+						configuration.getClass().getName());
+				}
+				return;
 			}
 			contributor.createConstraintMappings(() -> {
 				var mapping = hibernateConfiguration.createConstraintMapping();

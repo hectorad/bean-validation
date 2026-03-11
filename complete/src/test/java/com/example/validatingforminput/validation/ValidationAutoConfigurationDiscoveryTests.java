@@ -3,13 +3,21 @@ package com.example.validatingforminput.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Mockito;
 import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.autoconfigure.validation.ValidationConfigurationCustomizer;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.context.annotation.Bean;
 
+import jakarta.validation.Configuration;
+
+@ExtendWith(OutputCaptureExtension.class)
 class ValidationAutoConfigurationDiscoveryTests {
 
 	@Test
@@ -28,8 +36,46 @@ class ValidationAutoConfigurationDiscoveryTests {
 		}
 	}
 
+	@Test
+	void shouldBackOffWhenApplicationProvidesConstraintMergeService() {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(CustomConstraintMergeServiceApplication.class)
+			.web(WebApplicationType.NONE)
+			.run()) {
+			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
+			assertThat(context.getBean(ConstraintMergeService.class))
+				.isSameAs(context.getBean("customConstraintMergeService", ConstraintMergeService.class));
+		}
+	}
+
+	@Test
+	void shouldWarnAndSkipWhenCustomizerReceivesNonHibernateConfiguration(CapturedOutput output) {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(TestApplication.class)
+			.web(WebApplicationType.NONE)
+			.run()) {
+			ValidationConfigurationCustomizer customizer =
+				context.getBean("configDrivenValidationConfigurationCustomizer", ValidationConfigurationCustomizer.class);
+
+			@SuppressWarnings("unchecked")
+			Configuration<?> configuration = Mockito.mock(Configuration.class);
+			customizer.customize(configuration);
+
+			assertThat(output.getOut())
+				.contains("Skipping config-driven constraint mapping because the active Bean Validation provider is not Hibernate Validator");
+		}
+	}
+
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
 	static class TestApplication {
+	}
+
+	@SpringBootConfiguration
+	@EnableAutoConfiguration
+	static class CustomConstraintMergeServiceApplication {
+
+		@Bean
+		ConstraintMergeService customConstraintMergeService() {
+			return new ConstraintMergeService();
+		}
 	}
 }

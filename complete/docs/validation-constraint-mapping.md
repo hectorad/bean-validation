@@ -19,7 +19,7 @@ The flow is:
 
 1. `GeneratedClassMetadataCache` resolves configured classes and fields.
 2. It extracts baseline constraints from field and getter annotations.
-3. It validates configuration support for each field type (for example, `constraints.extensions` can only target a field named `extensions`).
+3. It validates configuration support for each field type.
 4. `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)` iterates over every resolved class and field.
 5. For each field, it gathers all `FieldConstraintContributor` outputs in Spring `@Order`.
 6. `ConstraintMergeService.merge(...)` combines baseline constraints and all contributed constraints into one `EffectiveFieldConstraints` object.
@@ -248,6 +248,7 @@ Its job is:
 
 - select the target field
 - ignore direct annotation processing for that field
+- replay preserved non-modeled constraints and cascade metadata
 - add programmatic constraints that match the merged result
 
 ### Step 1: get the field mapping context
@@ -271,7 +272,11 @@ Without `ignoreAnnotations(true)`, the runtime validator could see both:
 
 That would duplicate constraints and break the whole "merge into one final view" design.
 
-So the contributor intentionally disables direct annotation processing and then re-applies the effective result itself.
+So the contributor intentionally disables direct annotation processing and then re-applies:
+
+- preserved non-modeled Bean Validation annotations (for example custom constraints such as `@Email`)
+- preserved cascade metadata such as `@Valid` and `@ConvertGroup`
+- the merged modeled constraints from `EffectiveFieldConstraints`
 
 ### Step 2: apply `@NotNull`
 
@@ -406,9 +411,9 @@ Each `PatternRule` contains:
 
 The contributor recreates that rule as a Hibernate Validator `PatternDef`.
 
-### Important behavior: multiple patterns are cumulative
+### Important behavior: distinct patterns are cumulative
 
-If a field ends up with multiple patterns, all of them are applied.
+If a field ends up with multiple distinct patterns, all of them are applied.
 
 That means the field value must satisfy every pattern, not just one.
 
@@ -425,6 +430,8 @@ So `"John Doe"`:
 - does not match `^[A-Za-z]+$`
 
 Result: validation fails.
+
+Equivalent `regex + flags` identities are collapsed before the mapping is written, so a configured duplicate does not create duplicate violations for the same rule.
 
 That is why configured patterns act as a hardening mechanism in this project.
 
@@ -445,10 +452,10 @@ for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
 
 Runtime behavior of this validator:
 
-- if the `extensions` field itself is `null`, skip validation
-- evaluate the configured `jsonPath` against the `extensions` field value
+- if the target field itself is `null`, skip validation
+- evaluate the configured `jsonPath` against the target field value
 - apply `regex` to each resolved scalar value
-- if the `extensions` field is a blank JSON string, skip validation
+- if the target field is a blank JSON string, skip validation
 - if the path is missing, treat it as "condition not met" and skip validation
 - if a resolved value is `null`, skip that value
 - if a resolved scalar value does not match, raise a violation
@@ -635,10 +642,7 @@ appendConfiguredExtensions(extensionRules, effectiveConfig.getExtensions().getRu
 2. `jsonPath` must be non-empty and compile successfully
 3. `regex` must be non-empty and compile successfully
 
-The metadata layer (`GeneratedClassMetadataCache`) also enforces that:
-
-- `constraints.extensions` can only be configured for field name `extensions`
-- the field type must support JSONPath evaluation (`Map`, `Collection`, array, or JSON `String`)
+The metadata layer (`GeneratedClassMetadataCache`) also enforces that the field type must support JSONPath evaluation (`Map`, `Collection`, array, or JSON `String`).
 
 ### Final result
 
@@ -741,7 +745,6 @@ The contributor is not responsible for:
 - validating regex syntax
 - validating JSONPath syntax
 - validating impossible min/max combinations
-- enforcing that `constraints.extensions` is only configured on field `extensions`
 
 Those concerns are intentionally handled before or outside `applyConstraints(...)`.
 
