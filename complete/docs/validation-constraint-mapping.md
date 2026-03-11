@@ -9,7 +9,7 @@ This document explains how the config-driven validation pipeline works in this p
 The goal of the pipeline is to take:
 
 1. validation annotations already present on the Java model
-2. extra constraints configured in `com.ampp.business-validation-override.*` properties
+2. extra constraints contributed by `FieldConstraintContributor` beans (including the built-in properties contributor for `com.ampp.business-validation-override.*`)
 
 and turn them into one final set of Hibernate Validator rules that the application uses at runtime.
 
@@ -21,8 +21,9 @@ The flow is:
 2. It extracts baseline constraints from field and getter annotations.
 3. It validates configuration support for each field type (for example, `constraints.extensions` can only target a field named `extensions`).
 4. `ConfigDrivenConstraintMappingContributor.createConstraintMappings(...)` iterates over every resolved class and field.
-5. For each field, `ConstraintMergeService.merge(...)` combines baseline constraints and configured constraints into one `EffectiveFieldConstraints` object.
-6. `applyConstraints(...)` translates that `EffectiveFieldConstraints` object into Hibernate Validator programmatic mappings.
+5. For each field, it gathers all `FieldConstraintContributor` outputs in Spring `@Order`.
+6. `ConstraintMergeService.merge(...)` combines baseline constraints and all contributed constraints into one `EffectiveFieldConstraints` object.
+7. `applyConstraints(...)` translates that `EffectiveFieldConstraints` object into Hibernate Validator programmatic mappings.
 
 That means the policy decisions happen before `applyConstraints(...)`.
 
@@ -94,6 +95,27 @@ com:
                     message: Vendor extension code is invalid
 ```
 
+### `FieldConstraintContributor`
+
+Represents one source of configured constraints for a field:
+
+```java
+Optional<ValidationProperties.Constraints> contribute(
+	String className,
+	String fieldName,
+	BaselineFieldConstraints baseline);
+```
+
+All contributors are evaluated for every resolved field in Spring order:
+
+- lower `@Order` runs first
+- the built-in `PropertiesFieldConstraintContributor` runs at `@Order(0)`
+- exact strictness ties keep the first winner
+- patterns and extensions are additive in contributor order
+
+The built-in `PropertiesFieldConstraintContributor` adapts `com.ampp.business-validation-override.*` into this interface.
+If a custom contributor should beat properties on an exact tie, it must use an order lower than `0`.
+
 ### `EffectiveFieldConstraints`
 
 This is the final merged view used by the contributor.
@@ -123,22 +145,7 @@ Source: `ConfigDrivenConstraintMappingContributor`
 
 This method builds the runtime validation mapping for every configured class and field.
 
-### Step 1: index configured classes
-
-```java
-Map<String, ValidationProperties.ClassMapping> configuredClasses = indexByClass(validationProperties);
-```
-
-This makes config lookups fast by converting the list of class mappings into a map keyed by class name.
-
-If the config contains:
-
-- `PersonForm`
-- `AddressForm`
-
-then this map lets the contributor find a class mapping directly by name.
-
-### Step 2: loop over resolved classes
+### Step 1: loop over resolved classes
 
 ```java
 for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
@@ -158,7 +165,7 @@ This list has already been validated for things like:
 - field exists
 - duplicates
 
-### Step 3: create one Hibernate Validator mapping per class
+### Step 2: create one Hibernate Validator mapping per class
 
 ```java
 ConstraintMapping constraintMapping = builder.addConstraintMapping();
@@ -171,20 +178,7 @@ This tells Hibernate Validator:
 
 `typeContext` is the class-level builder that later gives field-level builders.
 
-### Step 4: index configured fields for the current class
-
-```java
-Map<String, ValidationProperties.FieldMapping> configuredFields =
-	indexByField(configuredClasses.get(resolvedClassMapping.className()));
-```
-
-This narrows the config to only the current class and builds a map by field name.
-
-If there is no config entry for the class, `indexByField(...)` returns an empty map.
-
-That is important because a field can still have baseline constraints even without extra config.
-
-### Step 5: loop over resolved fields
+### Step 3: loop over resolved fields
 
 ```java
 for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
@@ -195,25 +189,27 @@ Each `ResolvedFieldMapping` contains:
 - the field name
 - the baseline constraints extracted from annotations
 
-### Step 6: find the configured constraints for the current field
+### Step 4: collect contributed constraints for the field
 
 ```java
-ValidationProperties.FieldMapping configuredField = configuredFields.get(resolvedFieldMapping.fieldName());
-ValidationProperties.Constraints configuredConstraints =
-	(configuredField == null) ? null : configuredField.getConstraints();
+Iterable<ValidationProperties.Constraints> contributedConstraints =
+	contributedConstraints(className, fieldName, baseline);
 ```
 
-Possible outcomes:
+Contributors are invoked in Spring order:
 
-- field has config, so `configuredConstraints` is non-null
-- field has no config, so `configuredConstraints` is null
+- lower `@Order` values run first
+- the built-in properties contributor uses `@Order(0)`
+- ties keep the first winner for bound/message ownership
+- patterns and extensions are appended in contributor order
+- custom contributors must use an order lower than `0` to beat properties on exact ties
 
-### Step 7: merge baseline and config
+### Step 5: merge baseline and all contributors
 
 ```java
 EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
 	resolvedFieldMapping.baselineConstraints(),
-	configuredConstraints,
+	contributedConstraints,
 	resolvedClassMapping.className(),
 	resolvedFieldMapping.fieldName());
 ```
@@ -228,7 +224,7 @@ The contributor does not decide:
 
 That all happens in `merge(...)`.
 
-### Step 8: install the merged constraints
+### Step 6: install the merged constraints
 
 ```java
 applyConstraints(typeContext, resolvedFieldMapping.fieldName(), effectiveConstraints);
@@ -465,7 +461,7 @@ Source: `ConstraintMergeService`
 This method takes:
 
 - baseline constraints from code
-- configured constraints from properties
+- contributed constraints from one or more `FieldConstraintContributor` sources
 
 and produces one `EffectiveFieldConstraints`.
 
@@ -473,14 +469,10 @@ This is the method that decides what "stronger" means.
 
 ### Input normalization
 
-```java
-ValidationProperties.Constraints effectiveConfig =
-	(configuredConstraints == null) ? new ValidationProperties.Constraints() : configuredConstraints;
-```
+The merge starts from baseline constraints, then folds each contributor in order.
 
-If the field has no config, the method uses an empty config object instead of working with null.
-
-That keeps the rest of the logic simple.
+The mapping contributor now supplies constraints lazily as an `Iterable`, so the merge path no longer needs a per-field intermediate list.
+For backward compatibility, the single-source and list-based overloads still exist and delegate to the iterable-based merge path.
 
 ### Boolean constraints: `notNull` and `notBlank`
 
@@ -493,7 +485,7 @@ boolean notBlank = baseline.notBlank()
 	|| isTrue(effectiveConfig.getNotBlank().getHardValue());
 ```
 
-These are merged with OR semantics.
+These are merged with OR semantics across baseline and all contributors.
 
 If any source says the constraint should be enabled, the final result is enabled.
 
@@ -531,6 +523,7 @@ Example:
 Result: 21
 
 If two lower bounds have the same numeric value, exclusive is stricter than inclusive.
+If strictness is exactly equal, the first contributor that produced the winning bound keeps ownership (including message).
 
 The same logic still applies to `sizeMin`.
 
@@ -557,6 +550,8 @@ Example:
 - hard max = 55
 
 Result: 55
+
+If strictness is exactly equal, the first contributor that produced the winning bound keeps ownership (including message).
 
 If two upper bounds have the same numeric value, exclusive is stricter than inclusive.
 
@@ -761,7 +756,7 @@ This separation keeps the code easier to reason about:
 If you want to reason about a validation result:
 
 1. Look at baseline annotations on the field and getter.
-2. Look at configured properties for that field.
+2. Look at all `FieldConstraintContributor` outputs for that field (including properties-backed config).
 3. Look at how `ConstraintMergeService.merge(...)` combines them.
 4. Look at `applyConstraints(...)` to see how the merged result becomes real runtime constraints.
 
