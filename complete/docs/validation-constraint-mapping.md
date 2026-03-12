@@ -485,11 +485,9 @@ For backward compatibility, the single-source and list-based overloads still exi
 
 ```java
 boolean notNull = baseline.notNull()
-	|| isTrue(effectiveConfig.getNotNull().getValue())
-	|| isTrue(effectiveConfig.getNotNull().getHardValue());
+	|| isTrue(effectiveConfig.getNotNull().getValue());
 boolean notBlank = baseline.notBlank()
-	|| isTrue(effectiveConfig.getNotBlank().getValue())
-	|| isTrue(effectiveConfig.getNotBlank().getHardValue());
+	|| isTrue(effectiveConfig.getNotBlank().getValue());
 ```
 
 These are merged with OR semantics across baseline and all contributors.

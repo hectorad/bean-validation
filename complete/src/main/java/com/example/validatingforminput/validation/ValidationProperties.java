@@ -183,8 +183,6 @@ public class ValidationProperties {
 
         private Boolean value;
 
-        private Boolean hardValue;
-
         private String message;
 
         public Boolean getValue() {
@@ -193,14 +191,6 @@ public class ValidationProperties {
 
         public void setValue(Boolean value) {
             this.value = value;
-        }
-
-        public Boolean getHardValue() {
-            return hardValue;
-        }
-
-        public void setHardValue(Boolean hardValue) {
-            this.hardValue = hardValue;
         }
 
         public String getMessage() {
@@ -216,8 +206,6 @@ public class ValidationProperties {
 
         private Long value;
 
-        private Long hardValue;
-
         private String message;
 
         public Long getValue() {
@@ -226,14 +214,6 @@ public class ValidationProperties {
 
         public void setValue(Long value) {
             this.value = value;
-        }
-
-        public Long getHardValue() {
-            return hardValue;
-        }
-
-        public void setHardValue(Long hardValue) {
-            this.hardValue = hardValue;
         }
 
         public String getMessage() {
@@ -249,11 +229,7 @@ public class ValidationProperties {
 
         private BigDecimal value;
 
-        private BigDecimal hardValue;
-
         private Boolean inclusive;
-
-        private Boolean hardInclusive;
 
         private String message;
 
@@ -265,28 +241,12 @@ public class ValidationProperties {
             this.value = value;
         }
 
-        public BigDecimal getHardValue() {
-            return hardValue;
-        }
-
-        public void setHardValue(BigDecimal hardValue) {
-            this.hardValue = hardValue;
-        }
-
         public Boolean getInclusive() {
             return inclusive;
         }
 
         public void setInclusive(Boolean inclusive) {
             this.inclusive = inclusive;
-        }
-
-        public Boolean getHardInclusive() {
-            return hardInclusive;
-        }
-
-        public void setHardInclusive(Boolean hardInclusive) {
-            this.hardInclusive = hardInclusive;
         }
 
         public String getMessage() {

@@ -395,8 +395,7 @@ public class GeneratedClassMetadataCache {
 	}
 
 	private boolean isNotBlankEnabled(ValidationProperties.Constraints constraints) {
-		return Boolean.TRUE.equals(constraints.getNotBlank().getValue())
-			|| Boolean.TRUE.equals(constraints.getNotBlank().getHardValue());
+		return Boolean.TRUE.equals(constraints.getNotBlank().getValue());
 	}
 
 	private boolean hasNumericBounds(BaselineFieldConstraints baseline) {
@@ -405,20 +404,14 @@ public class GeneratedClassMetadataCache {
 
 	private boolean hasNumericBounds(ValidationProperties.Constraints constraints) {
 		return constraints.getMin().getValue() != null
-			|| constraints.getMin().getHardValue() != null
 			|| constraints.getMax().getValue() != null
-			|| constraints.getMax().getHardValue() != null
 			|| constraints.getDecimalMin().getValue() != null
-			|| constraints.getDecimalMin().getHardValue() != null
-			|| constraints.getDecimalMax().getValue() != null
-			|| constraints.getDecimalMax().getHardValue() != null;
+			|| constraints.getDecimalMax().getValue() != null;
 	}
 
 	private boolean hasSizeBounds(ValidationProperties.Constraints constraints) {
 		return constraints.getSize().getMin().getValue() != null
-			|| constraints.getSize().getMin().getHardValue() != null
-			|| constraints.getSize().getMax().getValue() != null
-			|| constraints.getSize().getMax().getHardValue() != null;
+			|| constraints.getSize().getMax().getValue() != null;
 	}
 
 	private boolean hasConfiguredPatterns(ValidationProperties.Constraints constraints) {

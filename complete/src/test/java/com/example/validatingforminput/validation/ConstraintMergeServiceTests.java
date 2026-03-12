@@ -15,30 +15,28 @@ class ConstraintMergeServiceTests {
 	private final ConstraintMergeService mergeService = new ConstraintMergeService();
 
 	@Test
-	void shouldKeepStricterLowerBoundUsingMaxRule() {
+	void shouldKeepStricterLowerBoundFromBaseline() {
 		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
 			false, false, NumericBound.inclusive(18L), null, null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getMin().setValue(16L);
-		constraints.getMin().setHardValue(21L);
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
 
-		assertBound(effective.min(), "21", true);
+		assertBound(effective.min(), "18", true);
 		assertThat(effective.minMessage()).isNull();
 	}
 
 	@Test
-	void shouldKeepStricterUpperBoundUsingMinRule() {
+	void shouldKeepStricterUpperBoundFromBaseline() {
 		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
 			false, false, null, NumericBound.inclusive(60L), null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getMax().setValue(70L);
-		constraints.getMax().setHardValue(55L);
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
 
-		assertBound(effective.max(), "55", true);
+		assertBound(effective.max(), "60", true);
 		assertThat(effective.maxMessage()).isNull();
 	}
 
@@ -110,12 +108,11 @@ class ConstraintMergeServiceTests {
 
 	@Test
 	void shouldPreferExclusiveBoundWhenValuesMatch() {
-		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
+			false, false, NumericBound.inclusive(21L), null, null, null, List.of());
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
-		constraints.getDecimalMin().setValue(new BigDecimal("21.0"));
-		constraints.getDecimalMin().setInclusive(true);
-		constraints.getDecimalMin().setHardValue(new BigDecimal("21"));
-		constraints.getDecimalMin().setHardInclusive(false);
+		constraints.getDecimalMin().setValue(new BigDecimal("21"));
+		constraints.getDecimalMin().setInclusive(false);
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
 
@@ -129,7 +126,7 @@ class ConstraintMergeServiceTests {
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getNotNull().setValue(true);
 		constraints.getNotNull().setMessage("Name is required");
-		constraints.getNotBlank().setHardValue(true);
+		constraints.getNotBlank().setValue(true);
 		constraints.getNotBlank().setMessage("Name must have text");
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
@@ -146,7 +143,7 @@ class ConstraintMergeServiceTests {
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getNotNull().setValue(false);
 		constraints.getNotNull().setMessage("ignored");
-		constraints.getNotBlank().setHardValue(false);
+		constraints.getNotBlank().setValue(false);
 		constraints.getNotBlank().setMessage("ignored");
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
@@ -329,7 +326,7 @@ class ConstraintMergeServiceTests {
 	void shouldFailWhenConfiguredSizeExceedsIntegerRange() {
 		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
-		constraints.getSize().getMax().setHardValue(((long) Integer.MAX_VALUE) + 1L);
+		constraints.getSize().getMax().setValue(((long) Integer.MAX_VALUE) + 1L);
 
 		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)

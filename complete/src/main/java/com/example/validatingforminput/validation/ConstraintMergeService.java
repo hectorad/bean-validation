@@ -47,7 +47,6 @@ public class ConstraintMergeService {
 			className,
 			fieldName,
 			"size.min.value",
-			"size.min.hardValue",
 			true);
 		SizeBoundCandidate sizeMaxCandidate = resolveSizeBound(
 			baseline.sizeMax(),
@@ -55,7 +54,6 @@ public class ConstraintMergeService {
 			className,
 			fieldName,
 			"size.max.value",
-			"size.max.hardValue",
 			false);
 
 		NumericBound min = bound(minCandidate);
@@ -110,7 +108,7 @@ public class ConstraintMergeService {
 		boolean baselineEnabled,
 		ValidationProperties.ToggleConstraint configuredConstraint
 	) {
-		boolean configuredEnabled = isTrue(configuredConstraint.getValue()) || isTrue(configuredConstraint.getHardValue());
+		boolean configuredEnabled = isTrue(configuredConstraint.getValue());
 		return new BooleanConstraintState(
 			baselineEnabled || configuredEnabled,
 			configuredEnabled ? configuredConstraint.getMessage() : null);
@@ -129,7 +127,6 @@ public class ConstraintMergeService {
 			numericSelector,
 			baselineCandidate(baseline),
 			toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
-			toInclusiveBound(numericConstraint.getHardValue(), numericConstraint.getMessage()),
 			toDecimalBound(
 				decimalConstraint.getValue(),
 				decimalConstraint.getInclusive(),
@@ -137,15 +134,7 @@ public class ConstraintMergeService {
 				className,
 				fieldName,
 				decimalPropertyPrefix + ".value",
-				decimalPropertyPrefix + ".inclusive"),
-			toDecimalBound(
-				decimalConstraint.getHardValue(),
-				decimalConstraint.getHardInclusive(),
-				decimalConstraint.getMessage(),
-				className,
-				fieldName,
-				decimalPropertyPrefix + ".hard-value",
-				decimalPropertyPrefix + ".hard-inclusive"));
+				decimalPropertyPrefix + ".inclusive"));
 	}
 
 	private SizeBoundCandidate resolveSizeBound(
@@ -154,7 +143,6 @@ public class ConstraintMergeService {
 		String className,
 		String fieldName,
 		String valueProperty,
-		String hardValueProperty,
 		boolean selectStricterLower
 	) {
 		return strictestSizeBound(
@@ -165,13 +153,7 @@ public class ConstraintMergeService {
 				configuredConstraint.getMessage(),
 				className,
 				fieldName,
-				valueProperty),
-			toSizeBound(
-				configuredConstraint.getHardValue(),
-				configuredConstraint.getMessage(),
-				className,
-				fieldName,
-				hardValueProperty));
+				valueProperty));
 	}
 
 	private BoundCandidate strictestBound(BinaryOperator<NumericBound> numericSelector, BoundCandidate... bounds) {

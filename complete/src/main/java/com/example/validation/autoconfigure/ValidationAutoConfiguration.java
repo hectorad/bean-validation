@@ -4,6 +4,7 @@ import com.example.validatingforminput.validation.ConfigDrivenConstraintMappingC
 import com.example.validatingforminput.validation.ConstraintMergeService;
 import com.example.validatingforminput.validation.GeneratedClassMetadataCache;
 import com.example.validatingforminput.validation.ValidationProperties;
+import com.example.validatingforminput.validation.ValidationTroubleshootingAnalyzer;
 import org.hibernate.validator.HibernateValidatorConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,19 @@ public class ValidationAutoConfiguration {
 		ConstraintMergeService constraintMergeService
 	) {
 		return new ConfigDrivenConstraintMappingContributor(
+			validationProperties,
+			generatedClassMetadataCache,
+			constraintMergeService);
+	}
+
+	@Bean
+	@ConditionalOnMissingBean(ValidationTroubleshootingAnalyzer.class)
+	public ValidationTroubleshootingAnalyzer validationTroubleshootingAnalyzer(
+		ValidationProperties validationProperties,
+		GeneratedClassMetadataCache generatedClassMetadataCache,
+		ConstraintMergeService constraintMergeService
+	) {
+		return new ValidationTroubleshootingAnalyzer(
 			validationProperties,
 			generatedClassMetadataCache,
 			constraintMergeService);

@@ -14,7 +14,6 @@ For a deep dive into the internal pipeline, see [validation-constraint-mapping.m
 - [Custom Messages](#custom-messages)
 - [Extensions Validation](#extensions-validation)
 - [Pattern Flags](#pattern-flags)
-- [Hard Values](#hard-values)
 - [Custom Contributors](#custom-contributors)
 - [Error Handling](#error-handling)
 - [Architecture Overview](#architecture-overview)
@@ -31,7 +30,6 @@ This framework provides a config-driven validation override system built on Jaka
 - Override or strengthen `@NotNull`, `@NotBlank`, `@Min`, `@Max`, `@DecimalMin`, `@DecimalMax`, `@Size`, and `@Pattern` constraints from YAML
 - Add JSONPath + regex validation rules for `Map<String, Object>` extension fields
 - Merge strategy that always selects the stricter constraint (configuration cannot weaken baseline annotations)
-- Force-override mechanism via `hardValue` to bypass normal merge rules
 - Pluggable contributor SPI (`FieldConstraintContributor`) for programmatic constraint sources
 - All configuration is validated eagerly at startup; invalid config prevents the application from booting
 
@@ -168,8 +166,7 @@ Ensures the field value is not `null`.
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Boolean` | Soft override. Enables the constraint if `true`. |
-| `hardValue` | `Boolean` | Hard override. Enables the constraint if `true`. |
+| `value` | `Boolean` | Enables the constraint if `true`. |
 | `message` | `String` | Custom error message. |
 
 ```yaml
@@ -188,8 +185,7 @@ Ensures a string field is not `null`, empty, or whitespace-only.
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Boolean` | Soft override. Enables the constraint if `true`. |
-| `hardValue` | `Boolean` | Hard override. Enables the constraint if `true`. |
+| `value` | `Boolean` | Enables the constraint if `true`. |
 | `message` | `String` | Custom error message. |
 
 ```yaml
@@ -210,8 +206,7 @@ Applies an inclusive numeric lower bound.
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Long` | Soft override value. |
-| `hardValue` | `Long` | Hard override value. |
+| `value` | `Long` | Override value. |
 | `message` | `String` | Custom error message. |
 
 ```yaml
@@ -222,7 +217,7 @@ min:
 
 **Supported field types:** `Integer`, `Long`, `Short`, `Byte`, `BigDecimal`, `BigInteger`, `String`.
 
-**Merge rule:** The strictest (highest) lower bound wins across all sources (baseline annotation, `min.value`, `min.hardValue`, `decimal-min.value`, `decimal-min.hardValue`). All sources compete and the highest value is selected.
+**Merge rule:** The strictest (highest) lower bound wins across all sources (baseline annotation, `min.value`, `decimal-min.value`). All sources compete and the highest value is selected.
 
 ---
 
@@ -232,8 +227,7 @@ Applies an inclusive numeric upper bound.
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Long` | Soft override value. |
-| `hardValue` | `Long` | Hard override value. |
+| `value` | `Long` | Override value. |
 | `message` | `String` | Custom error message. |
 
 ```yaml
@@ -252,10 +246,8 @@ Applies a decimal lower bound with optional inclusivity control.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `value` | `BigDecimal` | | Soft override value. |
-| `hardValue` | `BigDecimal` | | Hard override value. |
+| `value` | `BigDecimal` | | Override value. |
 | `inclusive` | `Boolean` | `true` | Whether the bound is inclusive. Requires `value`. |
-| `hardInclusive` | `Boolean` | `true` | Inclusivity for hard value. Requires `hardValue`. |
 | `message` | `String` | | Custom error message. |
 
 ```yaml
@@ -265,7 +257,7 @@ decimal-min:
   message: Salary must be greater than 1000.50
 ```
 
-**Important:** Setting `inclusive` without a corresponding `value` (or `hardInclusive` without `hardValue`) causes a startup failure.
+**Important:** Setting `inclusive` without a corresponding `value` causes a startup failure.
 
 **Merge rule:** Competes alongside `min` for the strictest lower bound. When two bounds have the same numeric value, exclusive is stricter than inclusive.
 
@@ -277,10 +269,8 @@ Applies a decimal upper bound with optional inclusivity control.
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `value` | `BigDecimal` | | Soft override value. |
-| `hardValue` | `BigDecimal` | | Hard override value. |
+| `value` | `BigDecimal` | | Override value. |
 | `inclusive` | `Boolean` | `true` | Whether the bound is inclusive. Requires `value`. |
-| `hardInclusive` | `Boolean` | `true` | Inclusivity for hard value. Requires `hardValue`. |
 | `message` | `String` | | Custom error message. |
 
 ```yaml
@@ -302,8 +292,7 @@ The `min` and `max` sub-properties each accept:
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Long` | Soft override value. Must be >= 0 and <= `Integer.MAX_VALUE`. |
-| `hardValue` | `Long` | Hard override value. Same range restrictions. |
+| `value` | `Long` | Override value. Must be >= 0 and <= `Integer.MAX_VALUE`. |
 | `message` | `String` | Custom error message. |
 
 ```yaml
@@ -566,45 +555,6 @@ pattern:
 
 ---
 
-## Hard Values
-
-The `hardValue` property bypasses the normal merge algorithm. Normal `value` properties participate in the strictest-wins merge against the baseline. Hard values are entered as competing candidates that always take precedence when they are the strictest.
-
-### Boolean Constraints (`not-null`, `not-blank`)
-
-For boolean constraints, both `value` and `hardValue` participate in OR semantics:
-
-- `hardValue: true` guarantees the constraint is enabled.
-- `hardValue: false` does **not** disable the constraint if the baseline annotation already enables it. The OR merge still applies.
-
-### Numeric Constraints (`min`, `max`, `decimal-min`, `decimal-max`, `size`)
-
-All candidates compete: baseline annotation, `value`, `hardValue`. The strictest bound still wins.
-
-```yaml
-# Baseline @Min(18), config value 16, hardValue 21
-# All three compete: 18, 16, 21 -> strictest lower bound = 21
-min:
-  value: 16
-  hardValue: 21
-  message: Must be at least 21
-```
-
-### Decimal Hard Values
-
-`decimal-min` and `decimal-max` support `hardValue` and `hardInclusive`:
-
-```yaml
-decimal-min:
-  hardValue: 5000.00
-  hardInclusive: false
-  message: Must exceed 5000.00
-```
-
-Setting `hardInclusive` without `hardValue` causes a startup failure.
-
----
-
 ## Custom Contributors
 
 The framework supports a pluggable SPI for providing constraint overrides from sources beyond YAML properties.
@@ -778,7 +728,7 @@ For a detailed walkthrough of the internal pipeline, see [validation-constraint-
 ## Troubleshooting
 
 **My override seems to have no effect.**
-The merge algorithm always selects the stricter value. If your configured value is less strict than the annotation baseline (e.g., config `min: 10` but annotation says `@Min(18)`), the baseline wins. Use `hardValue` if you need to force a specific value -- but note that hard values still compete with all other sources for the strictest outcome.
+The merge algorithm always selects the stricter value. If your configured value is less strict than the annotation baseline (e.g., config `min: 10` but annotation says `@Min(18)`), the baseline wins.
 
 **My application fails to start with "Configured class was not found."**
 Ensure `full-class-name` is the fully-qualified class name (e.g., `com.example.MyForm`, not `MyForm`) and the class is on the classpath.
@@ -796,7 +746,7 @@ You cannot. The framework uses OR semantics for boolean constraints: if any sour
 Yes. The field just needs to exist on the class. You can add any supported constraint purely from YAML, and the merge will treat the baseline as empty.
 
 **What happens if I set both `min` and `decimal-min` for the same field?**
-Both sources compete. The framework compares all candidates (baseline annotation, `min.value`, `min.hardValue`, `decimal-min.value`, `decimal-min.hardValue`) and selects the strictest lower bound.
+Both sources compete. The framework compares all candidates (baseline annotation, `min.value`, `decimal-min.value`) and selects the strictest lower bound.
 
 **Does the pattern `message` apply per-regex or to the whole block?**
 It applies to the whole configured block. All configured regexes in one `pattern` block share the same message. Baseline patterns from annotations keep their own default Jakarta messages.

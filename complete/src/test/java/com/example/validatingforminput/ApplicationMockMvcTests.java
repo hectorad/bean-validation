@@ -26,7 +26,6 @@ import jakarta.validation.ConstraintViolationException;
 	"com.ampp.business-validation-override[0].fields[1].field-name=age",
 	"com.ampp.business-validation-override[0].fields[1].constraints.not-null.value=true",
 	"com.ampp.business-validation-override[0].fields[1].constraints.min.value=25",
-	"com.ampp.business-validation-override[0].fields[1].constraints.min.hard-value=22",
 	"com.ampp.business-validation-override[0].fields[1].constraints.max.value=70"
 })
 @AutoConfigureMockMvc
