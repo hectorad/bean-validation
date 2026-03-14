@@ -10,6 +10,8 @@ import java.util.Objects;
 
 import org.hibernate.validator.cfg.ConstraintDef;
 import org.hibernate.validator.cfg.ConstraintMapping;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.hibernate.validator.cfg.GenericConstraintDef;
 import org.hibernate.validator.cfg.context.ContainerElementConstraintMappingContext;
 import org.hibernate.validator.cfg.context.PropertyConstraintMappingContext;
@@ -27,20 +29,34 @@ import jakarta.validation.constraints.Pattern;
 
 public class ConfigDrivenConstraintMappingContributor implements ConstraintMappingContributor {
 
+	private static final Logger log = LoggerFactory.getLogger(ConfigDrivenConstraintMappingContributor.class);
+
 	private final ValidationProperties validationProperties;
 
 	private final ConstraintMergeService constraintMergeService;
 
 	private final java.util.List<ResolvedClassMapping> resolvedClassMappings;
 
+	private final boolean failOnError;
+
 	public ConfigDrivenConstraintMappingContributor(
 		ValidationProperties validationProperties,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
 		ConstraintMergeService constraintMergeService
 	) {
+		this(validationProperties, generatedClassMetadataCache, constraintMergeService, true);
+	}
+
+	public ConfigDrivenConstraintMappingContributor(
+		ValidationProperties validationProperties,
+		GeneratedClassMetadataCache generatedClassMetadataCache,
+		ConstraintMergeService constraintMergeService,
+		boolean failOnError
+	) {
 		this.validationProperties = validationProperties;
 		this.constraintMergeService = constraintMergeService;
 		this.resolvedClassMappings = generatedClassMetadataCache.getResolvedMappings();
+		this.failOnError = failOnError;
 	}
 
 	@Override
@@ -55,17 +71,26 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				indexByField(configuredClasses.get(resolvedClassMapping.className()));
 
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
-				ValidationProperties.FieldMapping configuredField = configuredFields.get(resolvedFieldMapping.fieldName());
-				ValidationProperties.Constraints configuredConstraints =
-					(configuredField == null) ? null : configuredField.getConstraints();
+				try {
+					ValidationProperties.FieldMapping configuredField = configuredFields.get(resolvedFieldMapping.fieldName());
+					ValidationProperties.Constraints configuredConstraints =
+						(configuredField == null) ? null : configuredField.getConstraints();
 
-				EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
-					resolvedFieldMapping.baselineConstraints(),
-					configuredConstraints,
-					resolvedClassMapping.className(),
-					resolvedFieldMapping.fieldName());
+					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
+						resolvedFieldMapping.baselineConstraints(),
+						configuredConstraints,
+						resolvedClassMapping.className(),
+						resolvedFieldMapping.fieldName());
 
-				applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
+					applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
+				}
+				catch (RuntimeException exception) {
+					if (failOnError) {
+						throw exception;
+					}
+					log.warn("Skipping constraint mapping for class={}, field={} due to error: {}",
+						resolvedClassMapping.className(), resolvedFieldMapping.fieldName(), exception.getMessage());
+				}
 			}
 		}
 	}

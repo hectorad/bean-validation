@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 
 import jakarta.validation.Constraint;
@@ -36,6 +38,8 @@ import jakarta.validation.groups.ConvertGroup;
 
 public class GeneratedClassMetadataCache {
 
+	private static final Logger log = LoggerFactory.getLogger(GeneratedClassMetadataCache.class);
+
 	private static final Set<Class<? extends Annotation>> MODELED_CONSTRAINT_TYPES = Set.of(
 		NotNull.class,
 		NotBlank.class,
@@ -51,7 +55,14 @@ public class GeneratedClassMetadataCache {
 
 	private final List<ResolvedClassMapping> resolvedClassMappings;
 
+	private final boolean failOnError;
+
 	public GeneratedClassMetadataCache(ValidationProperties validationProperties) {
+		this(validationProperties, true);
+	}
+
+	public GeneratedClassMetadataCache(ValidationProperties validationProperties, boolean failOnError) {
+		this.failOnError = failOnError;
 		this.resolvedClassMappingsByName = buildResolvedMappings(validationProperties);
 		this.resolvedClassMappings = List.copyOf(this.resolvedClassMappingsByName.values());
 	}
@@ -72,26 +83,42 @@ public class GeneratedClassMetadataCache {
 		Map<String, ResolvedClassMapping> mappingIndex = new LinkedHashMap<>();
 
 		for (ValidationProperties.ClassMapping classMapping : validationProperties.getBusinessValidationOverride()) {
-			String className = normalizeClassName(classMapping);
-			if (mappingIndex.containsKey(className)) {
-				throw new IllegalStateException("Duplicate class mapping found in validation configuration: " + className);
-			}
-
-			Class<?> clazz = resolveClass(className);
-			Map<String, ResolvedFieldMapping> fieldMappingIndex = new LinkedHashMap<>();
-			for (ValidationProperties.FieldMapping fieldMapping : classMapping.getFields()) {
-				String fieldName = normalizeFieldName(className, fieldMapping);
-				if (fieldMappingIndex.containsKey(fieldName)) {
-					throw new IllegalStateException("Duplicate field mapping found for class " + className + ": " + fieldName);
+			try {
+				String className = normalizeClassName(classMapping);
+				if (mappingIndex.containsKey(className)) {
+					throw new IllegalStateException("Duplicate class mapping found in validation configuration: " + className);
 				}
 
-				ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(clazz, className, fieldMapping);
-				fieldMappingIndex.put(fieldName, resolvedFieldMapping);
-			}
+				Class<?> clazz = resolveClass(className);
+				Map<String, ResolvedFieldMapping> fieldMappingIndex = new LinkedHashMap<>();
+				for (ValidationProperties.FieldMapping fieldMapping : classMapping.getFields()) {
+					try {
+						String fieldName = normalizeFieldName(className, fieldMapping);
+						if (fieldMappingIndex.containsKey(fieldName)) {
+							throw new IllegalStateException("Duplicate field mapping found for class " + className + ": " + fieldName);
+						}
 
-			mappingIndex.put(
-				className,
-				new ResolvedClassMapping(className, clazz, new ArrayList<>(fieldMappingIndex.values())));
+						ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(clazz, className, fieldMapping);
+						fieldMappingIndex.put(fieldName, resolvedFieldMapping);
+					}
+					catch (RuntimeException exception) {
+						if (failOnError) {
+							throw exception;
+						}
+						log.warn("Skipping field mapping due to validation configuration error: {}", exception.getMessage());
+					}
+				}
+
+				mappingIndex.put(
+					className,
+					new ResolvedClassMapping(className, clazz, new ArrayList<>(fieldMappingIndex.values())));
+			}
+			catch (RuntimeException exception) {
+				if (failOnError) {
+					throw exception;
+				}
+				log.warn("Skipping class mapping due to validation configuration error: {}", exception.getMessage());
+			}
 		}
 
 		return Collections.unmodifiableMap(mappingIndex);

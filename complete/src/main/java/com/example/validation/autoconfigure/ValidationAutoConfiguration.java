@@ -31,7 +31,7 @@ public class ValidationAutoConfiguration {
 	@Bean
 	@ConditionalOnMissingBean(GeneratedClassMetadataCache.class)
 	public GeneratedClassMetadataCache generatedClassMetadataCache(ValidationProperties validationProperties) {
-		return new GeneratedClassMetadataCache(validationProperties);
+		return new GeneratedClassMetadataCache(validationProperties, validationProperties.isFailOnError());
 	}
 
 	@Bean
@@ -44,7 +44,8 @@ public class ValidationAutoConfiguration {
 		return new ConfigDrivenConstraintMappingContributor(
 			validationProperties,
 			generatedClassMetadataCache,
-			constraintMergeService);
+			constraintMergeService,
+			validationProperties.isFailOnError());
 	}
 
 	@Bean

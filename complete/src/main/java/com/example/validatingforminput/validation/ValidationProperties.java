@@ -15,8 +15,18 @@ import java.util.List;
 @ConfigurationProperties(prefix = "com.ampp")
 public class ValidationProperties {
 
+    private boolean failOnError = true;
+
     @Valid
     private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
+
+    public boolean isFailOnError() {
+        return failOnError;
+    }
+
+    public void setFailOnError(boolean failOnError) {
+        this.failOnError = failOnError;
+    }
 
     public List<ClassMapping> getBusinessValidationOverride() {
         return businessValidationOverride;

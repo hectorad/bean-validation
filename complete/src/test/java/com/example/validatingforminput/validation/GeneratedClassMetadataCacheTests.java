@@ -253,6 +253,93 @@ class GeneratedClassMetadataCacheTests {
 			.hasMessageContaining("Duplicate field mapping");
 	}
 
+	@Test
+	void shouldSkipUnknownClassWhenFailOnErrorIsFalse() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName("com.example.missing.MissingPerson");
+		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
+		fieldMapping.setFieldName("name");
+		classMapping.setFields(List.of(fieldMapping));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+	}
+
+	@Test
+	void shouldSkipUnknownFieldWhenFailOnErrorIsFalse() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(PersonForm.class.getName());
+		ValidationProperties.FieldMapping validField = new ValidationProperties.FieldMapping();
+		validField.setFieldName("name");
+		ValidationProperties.FieldMapping invalidField = new ValidationProperties.FieldMapping();
+		invalidField.setFieldName("doesNotExist");
+		classMapping.setFields(List.of(validField, invalidField));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+
+		assertThat(cache.getResolvedMappings()).hasSize(1);
+		assertThat(cache.getResolvedMappings().get(0).fields())
+			.singleElement()
+			.extracting(ResolvedFieldMapping::fieldName)
+			.isEqualTo("name");
+	}
+
+	@Test
+	void shouldSkipIncompatibleConstraintWhenFailOnErrorIsFalse() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(PersonForm.class.getName());
+
+		ValidationProperties.FieldMapping validField = new ValidationProperties.FieldMapping();
+		validField.setFieldName("name");
+
+		ValidationProperties.FieldMapping invalidField = new ValidationProperties.FieldMapping();
+		invalidField.setFieldName("age");
+		invalidField.getConstraints().getNotBlank().setValue(true);
+
+		classMapping.setFields(List.of(validField, invalidField));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+
+		assertThat(cache.getResolvedMappings()).hasSize(1);
+		assertThat(cache.getResolvedMappings().get(0).fields())
+			.singleElement()
+			.extracting(ResolvedFieldMapping::fieldName)
+			.isEqualTo("name");
+	}
+
+	@Test
+	void shouldSkipDuplicateClassMappingWhenFailOnErrorIsFalse() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping1 = new ValidationProperties.ClassMapping();
+		classMapping1.setFullClassName(PersonForm.class.getName());
+		ValidationProperties.FieldMapping fieldMapping1 = new ValidationProperties.FieldMapping();
+		fieldMapping1.setFieldName("name");
+		classMapping1.setFields(List.of(fieldMapping1));
+
+		ValidationProperties.ClassMapping classMapping2 = new ValidationProperties.ClassMapping();
+		classMapping2.setFullClassName(PersonForm.class.getName());
+		ValidationProperties.FieldMapping fieldMapping2 = new ValidationProperties.FieldMapping();
+		fieldMapping2.setFieldName("age");
+		classMapping2.setFields(List.of(fieldMapping2));
+
+		properties.setBusinessValidationOverride(List.of(classMapping1, classMapping2));
+
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+
+		assertThat(cache.getResolvedMappings()).hasSize(1);
+		assertThat(cache.getResolvedMappings().get(0).fields())
+			.singleElement()
+			.extracting(ResolvedFieldMapping::fieldName)
+			.isEqualTo("name");
+	}
+
 	private static final class UnsupportedConstraintTarget {
 
 		@SuppressWarnings("unused")
