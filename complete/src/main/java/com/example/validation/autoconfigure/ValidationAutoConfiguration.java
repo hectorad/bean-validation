@@ -36,6 +36,13 @@ public class ValidationAutoConfiguration {
 			+ "No constraints will be enforced on any field. ***");
 		return new NoOpValidatingLocalValidatorFactoryBean();
 	}
+
+	@Bean
+	@ConditionalOnMissingBean(PayloadValidationToggleProvider.class)
+	public PayloadValidationToggleProvider payloadValidationToggleProvider(Environment environment) {
+		return new EnvironmentBackedPayloadValidationToggleProvider(environment);
+	}
+
 	@Bean
 	@ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
 	public ConstraintMergeService constraintMergeService() {
