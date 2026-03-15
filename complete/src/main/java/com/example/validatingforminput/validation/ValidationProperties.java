@@ -15,10 +15,20 @@ import java.util.List;
 @ConfigurationProperties(prefix = "com.ampp")
 public class ValidationProperties {
 
+    private boolean validationEnabled = true;
+
     private boolean failOnError = true;
 
     @Valid
     private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
+
+    public boolean isValidationEnabled() {
+        return validationEnabled;
+    }
+
+    public void setValidationEnabled(boolean validationEnabled) {
+        this.validationEnabled = validationEnabled;
+    }
 
     public boolean isFailOnError() {
         return failOnError;
