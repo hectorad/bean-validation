@@ -4,12 +4,16 @@ import com.example.validatingforminput.validation.*;
 import org.hibernate.validator.HibernateValidatorConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.validation.ValidationConfigurationCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.validation.MessageInterpolatorFactory;
+import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 @AutoConfiguration(before = org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration.class)
@@ -25,6 +29,22 @@ public class ValidationAutoConfiguration {
         log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
                 + "No constraints will be enforced on any field. ***");
         return new NoOpValidatingLocalValidatorFactoryBean();
+    }
+
+    @Bean(name = "defaultValidator")
+    @Primary
+    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
+    public LocalValidatorFactoryBean defaultValidator(
+            ApplicationContext applicationContext,
+            ObjectProvider<ValidationConfigurationCustomizer> customizers,
+            ValidationProperties validationProperties
+    ) {
+        RequestAwareValidatingLocalValidatorFactoryBean factoryBean =
+                new RequestAwareValidatingLocalValidatorFactoryBean(validationProperties);
+        factoryBean.setConfigurationInitializer(configuration ->
+                customizers.orderedStream().forEach(customizer -> customizer.customize(configuration)));
+        factoryBean.setMessageInterpolator(new MessageInterpolatorFactory(applicationContext).getObject());
+        return factoryBean;
     }
 
     @Bean

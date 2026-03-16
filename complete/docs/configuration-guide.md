@@ -148,6 +148,11 @@ The configuration root is `com.ampp.business-validation-override`, which is a li
 
 ```yaml
 com.ampp:
+  validation-enabled: true
+  request-validation-bypass:
+    enabled: false
+    header-name: X-Skip-Validation
+    header-value: true
   business-validation-override:
     - full-class-name: <fully-qualified class name>  # required
       fields:                                         # required, non-empty
@@ -157,6 +162,31 @@ com.ampp:
 ```
 
 Each class mapping identifies a Java class by its fully-qualified name and lists the fields to configure. Each field mapping specifies one or more constraint blocks.
+
+---
+
+### Top-Level Flags
+
+| Property | Type | Default | Description |
+|---|---|---|---|
+| `validation-enabled` | `boolean` | `true` | Global kill switch. When `false`, Bean Validation is disabled for MVC, method validation, and direct validator usage. |
+| `fail-on-error` | `boolean` | `true` | Controls whether invalid override metadata fails fast during startup. |
+| `request-validation-bypass.enabled` | `boolean` | `false` | Enables a per-request validation bypass controlled by a trusted request header. |
+| `request-validation-bypass.header-name` | `String` | `X-Skip-Validation` | Header name checked on the current servlet request. |
+| `request-validation-bypass.header-value` | `String` | `true` | Exact header value required to bypass validation. |
+
+```yaml
+com.ampp:
+  validation-enabled: true
+  request-validation-bypass:
+    enabled: true
+    header-name: X-Skip-Validation
+    header-value: true
+```
+
+When request bypass is enabled and the configured header/value is present, validation is skipped only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
+
+**Trust boundary:** Treat the bypass header as an internal escape hatch. External traffic should not be allowed to set it directly; strip or overwrite it at the gateway or proxy layer before requests reach the application.
 
 ---
 

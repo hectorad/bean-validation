@@ -20,6 +20,9 @@ public class ValidationProperties {
     private boolean failOnError = true;
 
     @Valid
+    private RequestValidationBypass requestValidationBypass = new RequestValidationBypass();
+
+    @Valid
     private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
 
     public boolean isValidationEnabled() {
@@ -38,12 +41,57 @@ public class ValidationProperties {
         this.failOnError = failOnError;
     }
 
+    public RequestValidationBypass getRequestValidationBypass() {
+        return requestValidationBypass;
+    }
+
+    public void setRequestValidationBypass(RequestValidationBypass requestValidationBypass) {
+        this.requestValidationBypass = defaultValue(requestValidationBypass, RequestValidationBypass::new);
+    }
+
     public List<ClassMapping> getBusinessValidationOverride() {
         return businessValidationOverride;
     }
 
     public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
         this.businessValidationOverride = copyList(businessValidationOverride);
+    }
+
+    public static class RequestValidationBypass {
+
+        static final String DEFAULT_HEADER_NAME = "X-Skip-Validation";
+
+        static final String DEFAULT_HEADER_VALUE = "true";
+
+        private boolean enabled = false;
+
+        private String headerName = DEFAULT_HEADER_NAME;
+
+        private String headerValue = DEFAULT_HEADER_VALUE;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+
+        public String getHeaderName() {
+            return headerName;
+        }
+
+        public void setHeaderName(String headerName) {
+            this.headerName = defaultString(headerName, DEFAULT_HEADER_NAME);
+        }
+
+        public String getHeaderValue() {
+            return headerValue;
+        }
+
+        public void setHeaderValue(String headerValue) {
+            this.headerValue = defaultString(headerValue, DEFAULT_HEADER_VALUE);
+        }
     }
 
     public static class ClassMapping {
@@ -391,6 +439,11 @@ public class ValidationProperties {
         }
         String trimmed = value.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private static String defaultString(String value, String defaultValue) {
+        String trimmed = trimToNull(value);
+        return trimmed == null ? defaultValue : trimmed;
     }
 
     private static <T> List<T> copyList(List<T> values) {
