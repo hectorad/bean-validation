@@ -48,3 +48,4 @@ com.ampp:
                 - json-path: $.vendorExtensionCode
                   regex: "^[A-Z]{3}-[0-9]{4}$"
                   message: Vendor extension code format is invalid
+  validation-enabled: true

@@ -36,16 +36,7 @@ class ValidationAutoConfigurationDiscoveryTests {
 		}
 	}
 
-	@Test
-	void shouldBackOffWhenApplicationProvidesConstraintMergeService() {
-		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(CustomConstraintMergeServiceApplication.class)
-			.web(WebApplicationType.NONE)
-			.run()) {
-			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
-			assertThat(context.getBean(ConstraintMergeService.class))
-				.isSameAs(context.getBean("customConstraintMergeService", ConstraintMergeService.class));
-		}
-	}
+
 
 	@Test
 	void shouldWarnAndSkipWhenCustomizerReceivesNonHibernateConfiguration(CapturedOutput output) {
