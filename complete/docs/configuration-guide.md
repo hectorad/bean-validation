@@ -184,7 +184,7 @@ com.ampp:
     header-value: true
 ```
 
-When request bypass is enabled and the configured header/value is present, validation is skipped only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
+Precedence is explicit: `validation-enabled=false` disables validation everywhere first. When global validation remains enabled, the request-bypass header can skip validation only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
 
 **Trust boundary:** Treat the bypass header as an internal escape hatch. External traffic should not be allowed to set it directly; strip or overwrite it at the gateway or proxy layer before requests reach the application.
 

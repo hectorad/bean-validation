@@ -23,22 +23,17 @@ public class ValidationAutoConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(ValidationAutoConfiguration.class);
 
-    @Bean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "false")
-    public LocalValidatorFactoryBean noOpValidator() {
-        log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
-                + "No constraints will be enforced on any field. ***");
-        return new NoOpValidatingLocalValidatorFactoryBean();
-    }
-
     @Bean(name = "defaultValidator")
     @Primary
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public LocalValidatorFactoryBean defaultValidator(
             ApplicationContext applicationContext,
             ObjectProvider<ValidationConfigurationCustomizer> customizers,
             ValidationProperties validationProperties
     ) {
+        if (!validationProperties.isValidationEnabled()) {
+            log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
+                    + "No constraints will be enforced on any field. ***");
+        }
         RequestAwareValidatingLocalValidatorFactoryBean factoryBean =
                 new RequestAwareValidatingLocalValidatorFactoryBean(validationProperties);
         factoryBean.setConfigurationInitializer(configuration ->

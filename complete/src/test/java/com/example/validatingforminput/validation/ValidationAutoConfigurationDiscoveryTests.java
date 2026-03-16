@@ -15,6 +15,7 @@ import org.springframework.boot.test.system.CapturedOutput;
 import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import jakarta.validation.Configuration;
@@ -37,6 +38,20 @@ class ValidationAutoConfigurationDiscoveryTests {
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.containsBean("personValidationService")).isFalse();
 			assertThat(context.containsBean("webController")).isFalse();
+		}
+	}
+
+	@Test
+	void shouldProvideSameValidatorTypeWhenValidationIsDisabled() {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(TestApplication.class)
+			.web(WebApplicationType.NONE)
+			.run("--com.ampp.validation-enabled=false")) {
+			LocalValidatorFactoryBean validator = context.getBean("defaultValidator", LocalValidatorFactoryBean.class);
+
+			assertThat(validator).isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
+			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
+			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
+			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNull();
 		}
 	}
 

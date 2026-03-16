@@ -18,12 +18,23 @@ import jakarta.validation.executable.ExecutableValidator;
 
 public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValidatorFactoryBean {
 
+    private final ValidationProperties validationProperties;
+
     private final ValidationProperties.RequestValidationBypass requestValidationBypass;
 
     private final ExecutableValidator executableValidator = new RequestAwareExecutableValidator();
 
     public RequestAwareValidatingLocalValidatorFactoryBean(ValidationProperties validationProperties) {
+        this.validationProperties = validationProperties;
         this.requestValidationBypass = validationProperties.getRequestValidationBypass();
+    }
+
+    @Override
+    public void afterPropertiesSet() {
+        if (!validationProperties.isValidationEnabled()) {
+            return;
+        }
+        super.afterPropertiesSet();
     }
 
     @Override
@@ -74,6 +85,10 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
     }
 
     boolean shouldBypassValidation() {
+        if (!validationProperties.isValidationEnabled()) {
+            return true;
+        }
+
         if (!requestValidationBypass.isEnabled()) {
             return false;
         }

@@ -1,5 +1,6 @@
 package com.example.validatingforminput;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.model;
@@ -13,6 +14,8 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
+
+import jakarta.validation.Validator;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(
@@ -30,6 +33,9 @@ public class ApplicationValidationDisabledTests {
 
 	@Autowired
 	private PersonValidationService personValidationService;
+
+	@Autowired
+	private Validator validator;
 
 	@Test
 	public void shouldSkipMvcValidationWhenDisabled() throws Exception {
@@ -74,5 +80,14 @@ public class ApplicationValidationDisabledTests {
 	public void shouldSkipMethodValidationWhenGloballyDisabledEvenWithBypassHeader() throws Exception {
 		mockMvc.perform(post("/validation-probe/method").header("X-Skip-Validation", "true"))
 			.andExpect(status().isOk());
+	}
+
+	@Test
+	public void shouldSkipDirectValidatorUsageWhenDisabled() {
+		PersonForm form = new PersonForm();
+		form.setName("");
+		form.setAge(5);
+
+		assertThat(validator.validate(form)).isEmpty();
 	}
 }
