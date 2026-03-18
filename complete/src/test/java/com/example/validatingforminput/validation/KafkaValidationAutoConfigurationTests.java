@@ -36,12 +36,12 @@ class KafkaValidationAutoConfigurationTests {
             .run(context -> assertThat(context.getBeansOfType(RecordInterceptor.class)).hasSize(1));
     }
 
-	@Test
-	void shouldPassThroughValidRecord() {
-		ExternalPayloadValidator validator = new StubExternalPayloadValidator(ValidationResult.success("value"));
-		AtomicReference<ValidationResult<?>> capturedResult = new AtomicReference<>();
-		KafkaValidationFailureHandler failureHandler = (record, validationResult) -> capturedResult.set(validationResult);
-		ValidatingKafkaRecordInterceptor interceptor = new ValidatingKafkaRecordInterceptor(validator, failureHandler);
+    @Test
+    void shouldPassThroughValidRecord() {
+        ExternalPayloadValidator validator = new StubExternalPayloadValidator(ValidationResult.success("value"));
+        AtomicReference<ValidationResult<?>> capturedResult = new AtomicReference<>();
+        KafkaValidationFailureHandler failureHandler = (record, validationResult) -> capturedResult.set(validationResult);
+        ValidatingKafkaRecordInterceptor interceptor = new ValidatingKafkaRecordInterceptor(validator, failureHandler);
         ConsumerRecord<Object, Object> record = new ConsumerRecord<>("people", 0, 10L, "key", "value");
 
         ConsumerRecord<Object, Object> intercepted = interceptor.intercept(record, null);
@@ -50,14 +50,14 @@ class KafkaValidationAutoConfigurationTests {
         assertThat(capturedResult).hasValue(null);
     }
 
-	@Test
-	void shouldHandleInvalidRecordAndSkipListener() {
-		ValidationResult<Object> validationResult =
-			ValidationResult.failure("value", List.of(new ViolationDetail("name", "must not be blank", "{message}", "", "NotBlank")));
-		ExternalPayloadValidator validator = new StubExternalPayloadValidator(validationResult);
-		AtomicReference<ConsumerRecord<?, ?>> capturedRecord = new AtomicReference<>();
-		AtomicReference<ValidationResult<?>> capturedResult = new AtomicReference<>();
-		KafkaValidationFailureHandler failureHandler = (record, result) -> {
+    @Test
+    void shouldHandleInvalidRecordAndSkipListener() {
+        ValidationResult<Object> validationResult =
+            ValidationResult.failure("value", List.of(new ViolationDetail("name", "must not be blank", "{message}", "", "NotBlank")));
+        ExternalPayloadValidator validator = new StubExternalPayloadValidator(validationResult);
+        AtomicReference<ConsumerRecord<?, ?>> capturedRecord = new AtomicReference<>();
+        AtomicReference<ValidationResult<?>> capturedResult = new AtomicReference<>();
+        KafkaValidationFailureHandler failureHandler = (record, result) -> {
             capturedRecord.set(record);
             capturedResult.set(result);
         };
@@ -71,33 +71,33 @@ class KafkaValidationAutoConfigurationTests {
         assertThat(capturedResult).hasValue(validationResult);
     }
 
-	@Test
-	void shouldPropagateHandlerFailures() {
-		ExternalPayloadValidator validator = new StubExternalPayloadValidator(
-			ValidationResult.failure("value", List.of(new ViolationDetail("name", "invalid", "{message}", "value", "NotBlank"))));
-		KafkaValidationFailureHandler failureHandler = (record, result) -> {
-			throw new IllegalStateException("boom");
-		};
+    @Test
+    void shouldPropagateHandlerFailures() {
+        ExternalPayloadValidator validator = new StubExternalPayloadValidator(
+            ValidationResult.failure("value", List.of(new ViolationDetail("name", "invalid", "{message}", "value", "NotBlank"))));
+        KafkaValidationFailureHandler failureHandler = (record, result) -> {
+            throw new IllegalStateException("boom");
+        };
         ValidatingKafkaRecordInterceptor interceptor = new ValidatingKafkaRecordInterceptor(validator, failureHandler);
         ConsumerRecord<Object, Object> record = new ConsumerRecord<>("people", 0, 1L, "key", "value");
 
         assertThatThrownBy(() -> interceptor.intercept(record, null))
             .isInstanceOf(IllegalStateException.class)
             .hasMessage("boom");
-	}
+    }
 
-	private static final class StubExternalPayloadValidator implements ExternalPayloadValidator {
+    private static final class StubExternalPayloadValidator implements ExternalPayloadValidator {
 
-		private final ValidationResult<?> validationResult;
+        private final ValidationResult<?> validationResult;
 
-		private StubExternalPayloadValidator(ValidationResult<?> validationResult) {
-			this.validationResult = validationResult;
-		}
+        private StubExternalPayloadValidator(ValidationResult<?> validationResult) {
+            this.validationResult = validationResult;
+        }
 
-		@Override
-		@SuppressWarnings("unchecked")
-		public <T> ValidationResult<T> validate(T value) {
-			return (ValidationResult<T>) validationResult;
-		}
-	}
+        @Override
+        @SuppressWarnings("unchecked")
+        public <T> ValidationResult<T> validate(T value) {
+            return (ValidationResult<T>) validationResult;
+        }
+    }
 }

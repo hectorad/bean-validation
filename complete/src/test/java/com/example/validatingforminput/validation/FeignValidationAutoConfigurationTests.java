@@ -44,37 +44,37 @@ class FeignValidationAutoConfigurationTests {
     }
 
     @Test
-	void shouldReturnDecodedObjectWhenFeignPayloadIsValid() throws Exception {
-		LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-		ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
-		ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
-		FeignPayload payload = new FeignPayload();
-		payload.setName("valid");
+    void shouldReturnDecodedObjectWhenFeignPayloadIsValid() throws Exception {
+        LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
+        ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
+        FeignPayload payload = new FeignPayload();
+        payload.setName("valid");
 
-		Decoder decoder = capability.enrich((Decoder) (response, type) -> payload);
+        Decoder decoder = capability.enrich((Decoder) (response, type) -> payload);
 
-		assertThat(decoder.decode(response(), FeignPayload.class)).isSameAs(payload);
-		validatorFactoryBean.destroy();
-	}
+        assertThat(decoder.decode(response(), FeignPayload.class)).isSameAs(payload);
+        validatorFactoryBean.destroy();
+    }
 
     @Test
-	void shouldThrowValidationExceptionWithSameViolationsAsManualValidation() throws Exception {
-		LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-		ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
-		ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
-		FeignPayload payload = new FeignPayload();
-		payload.setName("");
-		ValidationResult<FeignPayload> manualResult = externalPayloadValidator.validate(payload);
-		Decoder decoder = capability.enrich((Decoder) (response, type) -> payload);
+    void shouldThrowValidationExceptionWithSameViolationsAsManualValidation() throws Exception {
+        LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
+        ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
+        FeignPayload payload = new FeignPayload();
+        payload.setName("");
+        ValidationResult<FeignPayload> manualResult = externalPayloadValidator.validate(payload);
+        Decoder decoder = capability.enrich((Decoder) (response, type) -> payload);
 
         assertThatThrownBy(() -> decoder.decode(response(), FeignPayload.class))
-			.isInstanceOfSatisfying(FeignResponseValidationException.class, exception -> {
-				assertThat(exception.getDecodedPayload()).isSameAs(payload);
-				assertThat(exception.getValidationResult().violations()).isEqualTo(manualResult.violations());
-			});
+            .isInstanceOfSatisfying(FeignResponseValidationException.class, exception -> {
+                assertThat(exception.getDecodedPayload()).isSameAs(payload);
+                assertThat(exception.getValidationResult().violations()).isEqualTo(manualResult.violations());
+            });
 
-		validatorFactoryBean.destroy();
-	}
+        validatorFactoryBean.destroy();
+    }
 
     private LocalValidatorFactoryBean validatorFactoryBean() {
         LocalValidatorFactoryBean validatorFactoryBean = new LocalValidatorFactoryBean();

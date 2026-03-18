@@ -30,11 +30,6 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
     }
 
     @Override
-    public void afterPropertiesSet() {
-        super.afterPropertiesSet();
-    }
-
-    @Override
     public void validate(Object target, Errors errors) {
         if (shouldBypassValidation()) {
             return;
