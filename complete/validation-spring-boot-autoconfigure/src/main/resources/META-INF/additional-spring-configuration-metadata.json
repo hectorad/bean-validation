@@ -1,0 +1,234 @@
+{
+  "groups": [
+    {
+      "name": "hector.validation",
+      "type": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties"
+    },
+    {
+      "name": "hector.validation.http-bypass",
+      "type": "io.github.hectorad.validation.autoconfigure.ValidationProperties$HttpBypass",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "sourceMethod": "getHttpBypass()"
+    },
+    {
+      "name": "hector.validation.feign",
+      "type": "io.github.hectorad.validation.autoconfigure.ValidationProperties$Feign",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "sourceMethod": "getFeign()"
+    },
+    {
+      "name": "hector.validation.kafka",
+      "type": "io.github.hectorad.validation.autoconfigure.ValidationProperties$Kafka",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "sourceMethod": "getKafka()"
+    }
+  ],
+  "properties": [
+    {
+      "name": "hector.validation.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "defaultValue": true,
+      "description": "Global validation switch."
+    },
+    {
+      "name": "hector.validation.fail-on-error",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties",
+      "defaultValue": true,
+      "description": "Fail startup when override metadata is invalid."
+    },
+    {
+      "name": "hector.validation.http-bypass.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$HttpBypass",
+      "defaultValue": false,
+      "description": "Enable servlet header-based validation bypass."
+    },
+    {
+      "name": "hector.validation.http-bypass.header-name",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$HttpBypass",
+      "defaultValue": "X-Skip-Validation",
+      "description": "Header name used by the servlet validation bypass strategy."
+    },
+    {
+      "name": "hector.validation.http-bypass.header-value",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$HttpBypass",
+      "defaultValue": "true",
+      "description": "Exact header value required to bypass validation."
+    },
+    {
+      "name": "hector.validation.feign.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$Feign",
+      "defaultValue": false,
+      "description": "Enable Feign response payload validation."
+    },
+    {
+      "name": "hector.validation.kafka.enabled",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$Kafka",
+      "defaultValue": false,
+      "description": "Enable Kafka record payload validation."
+    },
+    {
+      "name": "hector.validation.overrides[].class-name",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ClassOverrideProperties",
+      "description": "Fully qualified class name targeted by an override block."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].field-name",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$FieldOverrideProperties",
+      "description": "Field name targeted inside the class override block."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.not-null.value",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Enable NotNull for the target field."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.not-null.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom NotNull message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.not-blank.value",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Enable NotBlank for the target field."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.not-blank.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom NotBlank message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.min.value",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Inclusive integer minimum."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.min.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom minimum-bound message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.max.value",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Inclusive integer maximum."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.max.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom maximum-bound message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-min.value",
+      "type": "java.math.BigDecimal",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Decimal minimum."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-min.inclusive",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Whether the decimal minimum is inclusive."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-min.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom decimal minimum message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-max.value",
+      "type": "java.math.BigDecimal",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Decimal maximum."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-max.inclusive",
+      "type": "java.lang.Boolean",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Whether the decimal maximum is inclusive."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.decimal-max.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom decimal maximum message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.size.min.value",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Minimum size."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.size.min.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom minimum size message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.size.max.value",
+      "type": "java.lang.Long",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Maximum size."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.size.max.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom maximum size message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.pattern.regexes",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Additional regex patterns to enforce."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.pattern.flags",
+      "type": "java.util.List<java.lang.String>",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Pattern flags such as CASE_INSENSITIVE."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.pattern.message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom pattern message."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.extensions.rules[].json-path",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "JSONPath to evaluate inside the extensions payload."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.extensions.rules[].regex",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Regex that the JSONPath value must match."
+    },
+    {
+      "name": "hector.validation.overrides[].fields[].constraints.extensions.rules[].message",
+      "type": "java.lang.String",
+      "sourceType": "io.github.hectorad.validation.autoconfigure.ValidationProperties$ConstraintProperties",
+      "description": "Custom extensions-rule message."
+    }
+  ]
+}
