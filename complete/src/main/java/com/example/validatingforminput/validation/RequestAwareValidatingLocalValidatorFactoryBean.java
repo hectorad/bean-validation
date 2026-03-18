@@ -31,9 +31,6 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
 
     @Override
     public void afterPropertiesSet() {
-        if (!validationProperties.isValidationEnabled()) {
-            return;
-        }
         super.afterPropertiesSet();
     }
 

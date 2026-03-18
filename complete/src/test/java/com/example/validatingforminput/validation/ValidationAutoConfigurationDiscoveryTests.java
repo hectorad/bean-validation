@@ -34,6 +34,7 @@ class ValidationAutoConfigurationDiscoveryTests {
 			assertThat(context.getBeansOfType(ConfigDrivenConstraintMappingContributor.class)).hasSize(1);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).hasSize(1);
+			assertThat(context.getBeansOfType(ExternalPayloadValidator.class)).hasSize(1);
 			assertThat(context.getBean("defaultValidator", LocalValidatorFactoryBean.class))
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.containsBean("personValidationService")).isFalse();
@@ -51,11 +52,35 @@ class ValidationAutoConfigurationDiscoveryTests {
 			assertThat(validator).isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
-			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNull();
+			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNotNull();
+			assertThat(validator.usingContext()).isNotNull();
+			assertThat(validator.unwrap(jakarta.validation.ValidatorFactory.class)).isNotNull();
 		}
 	}
 
+	@Test
+	void shouldBackOffToUserProvidedConstraintMergeService() {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(CustomConstraintMergeServiceApplication.class)
+			.web(WebApplicationType.NONE)
+			.run()) {
+			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
+			Object contributor = context.getBean(ConfigDrivenConstraintMappingContributor.class);
+			assertThat(ReflectionTestUtils.getField(contributor, "constraintMergeService"))
+				.isSameAs(context.getBean("customConstraintMergeService"));
+		}
+	}
 
+	@Test
+	void shouldBackOffToUserProvidedDefaultValidator() {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(CustomDefaultValidatorApplication.class)
+			.web(WebApplicationType.NONE)
+			.run()) {
+			LocalValidatorFactoryBean validator = context.getBean("defaultValidator", LocalValidatorFactoryBean.class);
+
+			assertThat(validator).isNotInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
+			assertThat(context.getBeansOfType(LocalValidatorFactoryBean.class)).hasSize(1);
+		}
+	}
 
 	@Test
 	void shouldWarnAndSkipWhenCustomizerReceivesNonHibernateConfiguration(CapturedOutput output) {
@@ -105,6 +130,16 @@ class ValidationAutoConfigurationDiscoveryTests {
 		@Bean
 		ConstraintMergeService customConstraintMergeService() {
 			return new ConstraintMergeService();
+		}
+	}
+
+	@SpringBootConfiguration
+	@EnableAutoConfiguration
+	static class CustomDefaultValidatorApplication {
+
+		@Bean(name = "defaultValidator")
+		LocalValidatorFactoryBean customDefaultValidator() {
+			return new LocalValidatorFactoryBean();
 		}
 	}
 }

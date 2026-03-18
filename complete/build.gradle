@@ -17,7 +17,10 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'com.jayway.jsonpath:json-path'
+	compileOnly 'io.github.openfeign:feign-core:13.6'
+	compileOnly 'org.springframework.kafka:spring-kafka'
 	testImplementation('org.springframework.boot:spring-boot-starter-test')
+	testImplementation 'org.springframework.kafka:spring-kafka'
 }
 
 test {

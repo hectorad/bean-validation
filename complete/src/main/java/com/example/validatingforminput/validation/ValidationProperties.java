@@ -23,6 +23,12 @@ public class ValidationProperties {
     private RequestValidationBypass requestValidationBypass = new RequestValidationBypass();
 
     @Valid
+    private FeignResponseValidation feignResponseValidation = new FeignResponseValidation();
+
+    @Valid
+    private KafkaConsumerValidation kafkaConsumerValidation = new KafkaConsumerValidation();
+
+    @Valid
     private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
 
     public boolean isValidationEnabled() {
@@ -47,6 +53,22 @@ public class ValidationProperties {
 
     public void setRequestValidationBypass(RequestValidationBypass requestValidationBypass) {
         this.requestValidationBypass = defaultValue(requestValidationBypass, RequestValidationBypass::new);
+    }
+
+    public FeignResponseValidation getFeignResponseValidation() {
+        return feignResponseValidation;
+    }
+
+    public void setFeignResponseValidation(FeignResponseValidation feignResponseValidation) {
+        this.feignResponseValidation = defaultValue(feignResponseValidation, FeignResponseValidation::new);
+    }
+
+    public KafkaConsumerValidation getKafkaConsumerValidation() {
+        return kafkaConsumerValidation;
+    }
+
+    public void setKafkaConsumerValidation(KafkaConsumerValidation kafkaConsumerValidation) {
+        this.kafkaConsumerValidation = defaultValue(kafkaConsumerValidation, KafkaConsumerValidation::new);
     }
 
     public List<ClassMapping> getBusinessValidationOverride() {
@@ -91,6 +113,32 @@ public class ValidationProperties {
 
         public void setHeaderValue(String headerValue) {
             this.headerValue = defaultString(headerValue, DEFAULT_HEADER_VALUE);
+        }
+    }
+
+    public static class FeignResponseValidation {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    public static class KafkaConsumerValidation {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
         }
     }
 

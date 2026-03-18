@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.validation.ValidationConfigurationCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -15,6 +16,8 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+
+import jakarta.validation.Validator;
 
 @AutoConfiguration(before = org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration.class)
 @ConditionalOnClass({ValidationConfigurationCustomizer.class, HibernateValidatorConfiguration.class})
@@ -25,6 +28,7 @@ public class ValidationAutoConfiguration {
 
     @Bean(name = "defaultValidator")
     @Primary
+    @ConditionalOnMissingBean(name = "defaultValidator")
     public LocalValidatorFactoryBean defaultValidator(
             ApplicationContext applicationContext,
             ObjectProvider<ValidationConfigurationCustomizer> customizers,
@@ -43,18 +47,21 @@ public class ValidationAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public ConstraintMergeService constraintMergeService() {
         return new ConstraintMergeService();
     }
 
     @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public GeneratedClassMetadataCache generatedClassMetadataCache(ValidationProperties validationProperties) {
         return new GeneratedClassMetadataCache(validationProperties, validationProperties.isFailOnError());
     }
 
     @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
             ValidationProperties validationProperties,
@@ -69,6 +76,7 @@ public class ValidationAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public ValidationTroubleshootingAnalyzer validationTroubleshootingAnalyzer(
             ValidationProperties validationProperties,
@@ -79,6 +87,12 @@ public class ValidationAutoConfiguration {
                 validationProperties,
                 generatedClassMetadataCache,
                 constraintMergeService);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    public ExternalPayloadValidator externalPayloadValidator(Validator validator) {
+        return new BeanValidationExternalPayloadValidator(validator);
     }
 
     @Bean
