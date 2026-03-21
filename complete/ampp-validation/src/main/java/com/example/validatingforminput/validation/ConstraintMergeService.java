@@ -107,6 +107,116 @@ public class ConstraintMergeService {
 			extensionRules);
 	}
 
+	/**
+	 * Merges two {@link ConstraintOverrideSet} objects using strictness rules.
+	 * When both sets define a value for the same constraint, the stricter of the two wins:
+	 * <ul>
+	 *   <li>Boolean constraints (notNull, notBlank): {@code true} is stricter than {@code false}</li>
+	 *   <li>Lower bounds (min, decimalMin, size.min): the higher value is stricter</li>
+	 *   <li>Upper bounds (max, decimalMax, size.max): the lower value is stricter</li>
+	 *   <li>Patterns: combined additively — all unique regexes from both sets apply</li>
+	 *   <li>Extensions: combined additively — all rules from both sets apply</li>
+	 * </ul>
+	 */
+	public ConstraintOverrideSet mergeOverrides(ConstraintOverrideSet first, ConstraintOverrideSet second) {
+		if (first == null) return second != null ? second : ConstraintOverrideSet.EMPTY;
+		if (second == null) return first;
+		return new ConstraintOverrideSet(
+			stricterBooleanOverride(first.notNull(), second.notNull()),
+			stricterBooleanOverride(first.notBlank(), second.notBlank()),
+			stricterNumericLowerOverride(first.min(), second.min()),
+			stricterNumericUpperOverride(first.max(), second.max()),
+			stricterDecimalLowerOverride(first.decimalMin(), second.decimalMin()),
+			stricterDecimalUpperOverride(first.decimalMax(), second.decimalMax()),
+			stricterSizeOverride(first.size(), second.size()),
+			combinedPatternOverride(first.pattern(), second.pattern()),
+			combinedExtensionsOverride(first.extensions(), second.extensions())
+		);
+	}
+
+	private static ConstraintOverrideSet.BooleanOverride stricterBooleanOverride(
+		ConstraintOverrideSet.BooleanOverride a, ConstraintOverrideSet.BooleanOverride b
+	) {
+		if (a == null) return b;
+		if (b == null) return a;
+		if (Boolean.TRUE.equals(a.value())) return a;
+		if (Boolean.TRUE.equals(b.value())) return b;
+		return a;
+	}
+
+	private static ConstraintOverrideSet.NumericOverride stricterNumericLowerOverride(
+		ConstraintOverrideSet.NumericOverride a, ConstraintOverrideSet.NumericOverride b
+	) {
+		if (a == null || a.value() == null) return b;
+		if (b == null || b.value() == null) return a;
+		return (b.value() > a.value()) ? b : a;
+	}
+
+	private static ConstraintOverrideSet.NumericOverride stricterNumericUpperOverride(
+		ConstraintOverrideSet.NumericOverride a, ConstraintOverrideSet.NumericOverride b
+	) {
+		if (a == null || a.value() == null) return b;
+		if (b == null || b.value() == null) return a;
+		return (b.value() < a.value()) ? b : a;
+	}
+
+	private static ConstraintOverrideSet.DecimalOverride stricterDecimalLowerOverride(
+		ConstraintOverrideSet.DecimalOverride a, ConstraintOverrideSet.DecimalOverride b
+	) {
+		if (a == null || a.value() == null) return b;
+		if (b == null || b.value() == null) return a;
+		NumericBound aBound = new NumericBound(a.value(), a.inclusive() == null || a.inclusive());
+		NumericBound bBound = new NumericBound(b.value(), b.inclusive() == null || b.inclusive());
+		return (NumericBound.stricterLower(aBound, bBound) == bBound) ? b : a;
+	}
+
+	private static ConstraintOverrideSet.DecimalOverride stricterDecimalUpperOverride(
+		ConstraintOverrideSet.DecimalOverride a, ConstraintOverrideSet.DecimalOverride b
+	) {
+		if (a == null || a.value() == null) return b;
+		if (b == null || b.value() == null) return a;
+		NumericBound aBound = new NumericBound(a.value(), a.inclusive() == null || a.inclusive());
+		NumericBound bBound = new NumericBound(b.value(), b.inclusive() == null || b.inclusive());
+		return (NumericBound.stricterUpper(aBound, bBound) == bBound) ? b : a;
+	}
+
+	private static ConstraintOverrideSet.SizeOverride stricterSizeOverride(
+		ConstraintOverrideSet.SizeOverride a, ConstraintOverrideSet.SizeOverride b
+	) {
+		if (a == null) return b;
+		if (b == null) return a;
+		return new ConstraintOverrideSet.SizeOverride(
+			stricterNumericLowerOverride(a.min(), b.min()),
+			stricterNumericUpperOverride(a.max(), b.max())
+		);
+	}
+
+	private static ConstraintOverrideSet.PatternOverride combinedPatternOverride(
+		ConstraintOverrideSet.PatternOverride a, ConstraintOverrideSet.PatternOverride b
+	) {
+		if (a == null || a.regexes().isEmpty()) return b;
+		if (b == null || b.regexes().isEmpty()) return a;
+		List<String> combined = new ArrayList<>(a.regexes());
+		for (String regex : b.regexes()) {
+			if (!combined.contains(regex)) {
+				combined.add(regex);
+			}
+		}
+		List<String> flags = !a.flags().isEmpty() ? a.flags() : b.flags();
+		String message = a.message() != null ? a.message() : b.message();
+		return new ConstraintOverrideSet.PatternOverride(combined, flags, message);
+	}
+
+	private static ConstraintOverrideSet.ExtensionsOverride combinedExtensionsOverride(
+		ConstraintOverrideSet.ExtensionsOverride a, ConstraintOverrideSet.ExtensionsOverride b
+	) {
+		if (a == null || a.rules().isEmpty()) return b;
+		if (b == null || b.rules().isEmpty()) return a;
+		List<ConstraintOverrideSet.ExtensionRuleOverride> combined = new ArrayList<>(a.rules());
+		combined.addAll(b.rules());
+		return new ConstraintOverrideSet.ExtensionsOverride(combined);
+	}
+
 	private ConstraintOverrideSet defaultOverrides(ConstraintOverrideSet overrideSet) {
 		return (overrideSet == null) ? ConstraintOverrideSet.EMPTY : overrideSet;
 	}

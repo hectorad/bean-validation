@@ -31,7 +31,7 @@ class ValidationOverrideContributorOrderingTests {
     }
 
     @Test
-    void programmaticContributorWinsOverPropertiesContributor() {
+    void programmaticAndPropertiesContributorsAreOrderedCorrectly() {
         contextRunner
             .withUserConfiguration(HighPriorityContributorConfiguration.class)
             .withPropertyValues(

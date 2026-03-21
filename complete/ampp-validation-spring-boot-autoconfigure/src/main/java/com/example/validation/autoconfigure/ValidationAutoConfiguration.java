@@ -81,9 +81,10 @@ public class ValidationAutoConfiguration {
     @Bean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public List<ClassValidationOverride> mergedValidationOverrides(
-            ObjectProvider<ValidationOverrideContributor> contributorProvider
+            ObjectProvider<ValidationOverrideContributor> contributorProvider,
+            ConstraintMergeService constraintMergeService
     ) {
-        return mergeContributorOverrides(contributorProvider.orderedStream().toList());
+        return mergeContributorOverrides(contributorProvider.orderedStream().toList(), constraintMergeService);
     }
 
     @Bean
@@ -158,11 +159,13 @@ public class ValidationAutoConfiguration {
 
     /**
      * Merges overrides from all contributors into a single list of class overrides.
-     * When multiple contributors target the same class/field, the first contributor
-     * (highest priority) wins for that field.
+     * When multiple contributors target the same class/field, constraint values are
+     * merged using strictness rules: the most restrictive value for each constraint
+     * type wins, regardless of contributor ordering.
      */
     private static List<ClassValidationOverride> mergeContributorOverrides(
-            List<ValidationOverrideContributor> contributors
+            List<ValidationOverrideContributor> contributors,
+            ConstraintMergeService constraintMergeService
     ) {
         Map<String, Map<String, FieldValidationOverride>> classIndex = new LinkedHashMap<>();
         for (ValidationOverrideContributor contributor : contributors) {
@@ -176,7 +179,11 @@ public class ValidationAutoConfiguration {
                     if (fieldOverride.fieldName() == null) {
                         continue;
                     }
-                    fieldIndex.putIfAbsent(fieldOverride.fieldName(), fieldOverride);
+                    fieldIndex.merge(fieldOverride.fieldName(), fieldOverride, (existing, incoming) ->
+                        new FieldValidationOverride(
+                            existing.fieldName(),
+                            constraintMergeService.mergeOverrides(existing.constraints(), incoming.constraints())
+                        ));
                 }
             }
         }
