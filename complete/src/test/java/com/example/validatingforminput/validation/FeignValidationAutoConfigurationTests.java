@@ -1,6 +1,7 @@
 package com.example.validatingforminput.validation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.nio.charset.StandardCharsets;
@@ -13,10 +14,13 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.example.validation.autoconfigure.FeignValidationAutoConfiguration;
 import com.example.validation.autoconfigure.ValidationAutoConfiguration;
+import com.example.validatingforminput.validation.feign.DefaultFeignValidationCapabilityFactory;
+import com.example.validatingforminput.validation.feign.FeignValidationCapabilityFactory;
 import com.example.validatingforminput.validation.feign.FeignResponseValidationException;
 import com.example.validatingforminput.validation.feign.ValidatingFeignCapability;
 
 import feign.Capability;
+import feign.Feign;
 import feign.Request;
 import feign.Response;
 import feign.codec.Decoder;
@@ -32,22 +36,27 @@ class FeignValidationAutoConfigurationTests {
 
     @Test
     void shouldNotCreateFeignCapabilityWhenFeatureFlagIsDisabled() {
-        contextRunner.run(context -> assertThat(context.getBeansOfType(Capability.class)).isEmpty());
+        contextRunner.run(context -> {
+            assertThat(context.getBeansOfType(FeignValidationCapabilityFactory.class)).isEmpty();
+            assertThat(context.getBeansOfType(Capability.class)).isEmpty();
+        });
     }
 
     @Test
-    void shouldCreateFeignCapabilityWhenFeatureFlagIsEnabled() {
+    void shouldCreateFeignValidationCapabilityFactoryWhenFeatureFlagIsEnabled() {
         contextRunner
             .withPropertyValues("com.ampp.feign-response-validation.enabled=true")
-            .run(context -> assertThat(context.getBeansOfType(Capability.class))
-                .containsValue(context.getBean(ValidatingFeignCapability.class)));
+            .run(context -> {
+                assertThat(context.getBeansOfType(FeignValidationCapabilityFactory.class)).hasSize(1);
+                assertThat(context.getBeansOfType(Capability.class)).isEmpty();
+                assertThat(context.getBeanProvider(Capability.class).orderedStream().toList()).isEmpty();
+            });
     }
 
     @Test
     void shouldReturnDecodedObjectWhenFeignPayloadIsValid() throws Exception {
         LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-        ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
-        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(validatorFactoryBean);
         FeignPayload payload = new FeignPayload();
         payload.setName("valid");
 
@@ -60,8 +69,8 @@ class FeignValidationAutoConfigurationTests {
     @Test
     void shouldThrowValidationExceptionWithSameViolationsAsManualValidation() throws Exception {
         LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-        ExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
-        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
+        BeanValidationExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(validatorFactoryBean);
         FeignPayload payload = new FeignPayload();
         payload.setName("");
         ValidationResult<FeignPayload> manualResult = externalPayloadValidator.validate(payload);
@@ -73,6 +82,18 @@ class FeignValidationAutoConfigurationTests {
                 assertThat(exception.getValidationResult().violations()).isEqualTo(manualResult.violations());
             });
 
+        validatorFactoryBean.destroy();
+    }
+
+    @Test
+    void shouldCreateCapabilityForManualFeignBuilderUsage() {
+        LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
+        FeignValidationCapabilityFactory factory = new DefaultFeignValidationCapabilityFactory(validatorFactoryBean);
+
+        Capability capability = factory.create();
+
+        assertThat(capability).isInstanceOf(ValidatingFeignCapability.class);
+        assertThatCode(() -> Feign.builder().addCapability(capability)).doesNotThrowAnyException();
         validatorFactoryBean.destroy();
     }
 
