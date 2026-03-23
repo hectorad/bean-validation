@@ -2,18 +2,17 @@ package com.example.validatingforminput.validation;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.EnumSet;
-import java.util.List;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Set;
 import java.util.function.BinaryOperator;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
+
 public class ConstraintMergeService {
 
 	public EffectiveFieldConstraints merge(
@@ -72,7 +71,6 @@ public class ConstraintMergeService {
 		appendConfiguredPatterns(
 			patterns,
 			effectiveConfig.getPattern().getRegexes(),
-			effectiveConfig.getPattern().getFlags(),
 			effectiveConfig.getPattern().getMessage(),
 			className,
 			fieldName);
@@ -253,25 +251,20 @@ public class ConstraintMergeService {
 	private void appendConfiguredPatterns(
 		List<PatternRule> patterns,
 		List<String> configuredRegexes,
-		List<String> configuredFlags,
 		String configuredMessage,
 		String className,
 		String fieldName
 	) {
-		Set<jakarta.validation.constraints.Pattern.Flag> parsedFlags =
-			parsePatternFlags(configuredFlags, className, fieldName);
 		Map<PatternIdentity, Integer> patternIndexes = indexPatterns(patterns);
 		for (int index = 0; index < configuredRegexes.size(); index++) {
 			PatternRule configuredPattern =
-				toConfiguredPatternRule(configuredRegexes.get(index), parsedFlags, configuredMessage, className, fieldName, index);
-			PatternIdentity patternIdentity = new PatternIdentity(configuredPattern.regex(), configuredPattern.flags());
+				toConfiguredPatternRule(configuredRegexes.get(index), configuredMessage, className, fieldName, index);
+			PatternIdentity patternIdentity = new PatternIdentity(configuredPattern.regex());
 			Integer existingIndex = patternIndexes.get(patternIdentity);
 			if (existingIndex != null) {
 				PatternRule existingPattern = patterns.get(existingIndex);
 				if (configuredPattern.message() != null && !Objects.equals(existingPattern.message(), configuredPattern.message())) {
-					patterns.set(
-						existingIndex,
-						new PatternRule(existingPattern.regex(), existingPattern.flags(), configuredPattern.message()));
+					patterns.set(existingIndex, new PatternRule(existingPattern.regex(), configuredPattern.message()));
 				}
 				continue;
 			}
@@ -284,14 +277,13 @@ public class ConstraintMergeService {
 		Map<PatternIdentity, Integer> indexes = new LinkedHashMap<>();
 		for (int index = 0; index < patterns.size(); index++) {
 			PatternRule patternRule = patterns.get(index);
-			indexes.putIfAbsent(new PatternIdentity(patternRule.regex(), patternRule.flags()), index);
+			indexes.putIfAbsent(new PatternIdentity(patternRule.regex()), index);
 		}
 		return indexes;
 	}
 
 	private PatternRule toConfiguredPatternRule(
 		String regex,
-		Set<jakarta.validation.constraints.Pattern.Flag> flags,
 		String configuredMessage,
 		String className,
 		String fieldName,
@@ -299,32 +291,7 @@ public class ConstraintMergeService {
 	) {
 		String requiredRegex = requireNonEmpty("pattern", "regex", regex, className, fieldName, index);
 		validateRegex("pattern", requiredRegex, className, fieldName, index);
-		return new PatternRule(requiredRegex, flags, configuredMessage);
-	}
-
-	private Set<jakarta.validation.constraints.Pattern.Flag> parsePatternFlags(
-		List<String> flagNames,
-		String className,
-		String fieldName
-	) {
-		if (flagNames == null || flagNames.isEmpty()) {
-			return EnumSet.noneOf(jakarta.validation.constraints.Pattern.Flag.class);
-		}
-		Set<jakarta.validation.constraints.Pattern.Flag> flags =
-			EnumSet.noneOf(jakarta.validation.constraints.Pattern.Flag.class);
-		for (String flagName : flagNames) {
-			try {
-				flags.add(jakarta.validation.constraints.Pattern.Flag.valueOf(flagName));
-			}
-			catch (IllegalArgumentException exception) {
-				throw new InvalidConstraintConfigurationException(
-					"Invalid pattern flag '" + flagName + "' for class=" + className
-						+ ", field=" + fieldName + ". Valid flags: "
-						+ java.util.Arrays.toString(jakarta.validation.constraints.Pattern.Flag.values()),
-					exception);
-			}
-		}
-		return flags;
+		return new PatternRule(requiredRegex, configuredMessage);
 	}
 
 	private SizeBoundCandidate toSizeBound(
@@ -468,10 +435,6 @@ public class ConstraintMergeService {
 	private record BooleanConstraintState(boolean enabled, String message) {
 	}
 
-	private record PatternIdentity(String regex, Set<jakarta.validation.constraints.Pattern.Flag> flags) {
-
-		private PatternIdentity {
-			flags = Set.copyOf(flags);
-		}
+	private record PatternIdentity(String regex) {
 	}
 }

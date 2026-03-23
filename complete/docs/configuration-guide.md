@@ -13,7 +13,6 @@ For a deep dive into the internal pipeline, see [validation-constraint-mapping.m
 - [Merge Behavior](#merge-behavior)
 - [Custom Messages](#custom-messages)
 - [Extensions Validation](#extensions-validation)
-- [Pattern Flags](#pattern-flags)
 - [Custom Contributors](#custom-contributors)
 - [Error Handling](#error-handling)
 - [Architecture Overview](#architecture-overview)
@@ -350,7 +349,6 @@ Validates a string against one or more regular expressions.
 | Property | Type | Description |
 |---|---|---|
 | `regexes` | `List<String>` | One or more regex patterns. All must match. |
-| `flags` | `List<String>` | Pattern flag names (see [Pattern Flags](#pattern-flags)). |
 | `message` | `String` | Shared message for all regexes in this block. |
 
 ```yaml
@@ -358,14 +356,12 @@ pattern:
   regexes:
     - "^[A-Za-z ]+$"
     - "^[A-Z].*"
-  flags:
-    - CASE_INSENSITIVE
   message: Invalid name format
 ```
 
 **Restriction:** Only valid on `CharSequence` (String) fields.
 
-**Merge rule:** Patterns are cumulative. Distinct `regex + flags` combinations are all enforced (AND semantics), but duplicate identities are collapsed into one effective rule. If configuration repeats a baseline-equivalent pattern and provides a message, that message becomes the effective message for the single surviving rule.
+**Merge rule:** Patterns are cumulative. Distinct regexes are all enforced (AND semantics), but duplicate regex identities are collapsed into one effective rule. If configuration repeats a baseline-equivalent regex and provides a message, that message becomes the effective message for the single surviving rule.
 
 ---
 
@@ -409,7 +405,7 @@ The framework merges baseline constraints (from annotations) with configured con
 | `size.min` | Higher value wins | `@Size(min=3)` + config `5` = 5 |
 | `size.max` | Lower value wins | `@Size(max=30)` + config `25` = 25 |
 | Equal numeric bounds | Exclusive beats inclusive | Both at `10`: exclusive wins over inclusive |
-| `pattern` | Cumulative by identity (all distinct rules must match) | Baseline + config patterns both enforced; duplicate `regex + flags` rules collapse |
+| `pattern` | Cumulative by identity (all distinct rules must match) | Baseline + config patterns both enforced; duplicate regex rules collapse |
 | `extensions` | Additive across contributors | Rules from all sources are combined |
 
 ### Walkthrough Example
@@ -548,43 +544,6 @@ extensions:
 
 ---
 
-## Pattern Flags
-
-Pattern flags modify regex matching behavior. They correspond to `jakarta.validation.constraints.Pattern.Flag` enum values.
-
-### Supported Flags
-
-| Flag | Description |
-|---|---|
-| `UNIX_LINES` | Only `\n` is recognized as a line terminator |
-| `CASE_INSENSITIVE` | Case-insensitive matching |
-| `COMMENTS` | Whitespace and comments in the pattern are ignored |
-| `MULTILINE` | `^` and `$` match at line boundaries |
-| `DOTALL` | `.` matches any character including line terminators |
-| `UNICODE_CASE` | Unicode-aware case folding |
-| `CANON_EQ` | Canonical equivalence matching |
-
-### Usage
-
-```yaml
-pattern:
-  regexes:
-    - "^[a-z]+$"
-  flags:
-    - CASE_INSENSITIVE
-    - MULTILINE
-  message: Must contain only letters
-```
-
-### Important Notes
-
-- Flag names are **case-sensitive**. `case_insensitive` causes a startup failure.
-- Flags apply to **all regexes** in the same `pattern` block.
-- Baseline patterns from `@Pattern` annotations keep their own flags from the annotation. Config flags do not retroactively affect baseline patterns.
-- An invalid flag name causes a startup failure with an error message listing all valid flags.
-
----
-
 ## Custom Contributors
 
 The framework supports a pluggable SPI for providing constraint overrides from sources beyond YAML properties.
@@ -684,8 +643,6 @@ Spring validates `ValidationProperties` on binding:
 | `jsonPath could not be compiled` | Invalid JSONPath syntax |
 | `must be >= 0` | Negative size value |
 | `exceeds Integer.MAX_VALUE` | Size value too large |
-| `Invalid pattern flag '<flag>'` | Unrecognized flag name (error lists valid flags) |
-
 ### Example: Invalid Range
 
 ```yaml
@@ -748,7 +705,7 @@ ConstraintContributor           + baseline
 | `BaselineFieldConstraints` | Constraints extracted from Java annotations |
 | `EffectiveFieldConstraints` | Final merged constraints with messages |
 | `NumericBound` | Numeric value + inclusive flag |
-| `PatternRule` | Regex + flags + optional message |
+| `PatternRule` | Regex + optional message |
 | `ExtensionRegexRule` | JSONPath + regex + optional message |
 
 For a detailed walkthrough of the internal pipeline, see [validation-constraint-mapping.md](validation-constraint-mapping.md).

@@ -73,8 +73,6 @@ com:
               pattern:
                 regexes:
                   - ^[A-Za-z]+$
-                flags:
-                  - CASE_INSENSITIVE
                 message: Name must contain only letters
           - field-name: age
             constraints:
@@ -388,28 +386,16 @@ Examples:
 
 ```java
 for (PatternRule patternRule : effectiveConstraints.patterns()) {
-	PatternDef patternDef = new PatternDef().regexp(patternRule.regex());
-	if (!patternRule.flags().isEmpty()) {
-		patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
-	}
-	propertyContext.constraint(patternDef);
+	propertyContext.constraint(new PatternDef().regexp(patternRule.regex()));
 }
 ```
 
 This loop adds one `@Pattern` constraint for every effective regex rule.
 
-The project uses `PatternRule` instead of raw strings because a regex may also carry flags such as:
-
-- `CASE_INSENSITIVE`
-- `MULTILINE`
-
 Each `PatternRule` contains:
 
 - `regex`
-- `flags`
 - `message` (optional)
-
-The contributor recreates that rule as a Hibernate Validator `PatternDef`.
 
 ### Important behavior: distinct patterns are cumulative
 
@@ -431,7 +417,7 @@ So `"John Doe"`:
 
 Result: validation fails.
 
-Equivalent `regex + flags` identities are collapsed before the mapping is written, so a configured duplicate does not create duplicate violations for the same rule.
+Equivalent regex identities are collapsed before the mapping is written, so a configured duplicate does not create duplicate violations for the same rule.
 
 That is why configured patterns act as a hardening mechanism in this project.
 
@@ -604,9 +590,12 @@ The merge service rejects these immediately.
 
 ```java
 List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
-appendConfiguredPatterns(patterns, effectiveConfig.getPattern().getRegexes(),
-	effectiveConfig.getPattern().getFlags(), effectiveConfig.getPattern().getMessage(),
-	className, fieldName);
+appendConfiguredPatterns(
+	patterns,
+	effectiveConfig.getPattern().getRegexes(),
+	effectiveConfig.getPattern().getMessage(),
+	className,
+	fieldName);
 ```
 
 Patterns are not replaced.
@@ -619,13 +608,10 @@ That means configured patterns make the field stricter by adding more rules.
 
 `appendConfiguredPatterns(...)` does three things before adding a regex:
 
-1. parses configured flag names (e.g., `CASE_INSENSITIVE`) into `Pattern.Flag` enum values, rejecting invalid names
-2. validates that each regex is not null or empty
-3. validates that each regex compiles successfully
+1. validates that each regex is not null or empty
+2. validates that each regex compiles successfully
 
 If any check fails, the method throws `InvalidConstraintConfigurationException`.
-
-Configured flags apply to all regexes in the same `pattern` block. Baseline patterns keep their own flags from annotations.
 
 ### `extensions` rules are validated and merged
 

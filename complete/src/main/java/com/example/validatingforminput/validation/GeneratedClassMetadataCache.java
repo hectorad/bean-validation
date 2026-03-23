@@ -12,7 +12,6 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -365,11 +364,7 @@ public class GeneratedClassMetadataCache {
 			baselineAccumulator.sizeMax = minNullable(baselineAccumulator.sizeMax, size.max());
 		}
 		for (Pattern pattern : element.getAnnotationsByType(Pattern.class)) {
-			Set<Pattern.Flag> flags = EnumSet.noneOf(Pattern.Flag.class);
-			for (Pattern.Flag flag : pattern.flags()) {
-				flags.add(flag);
-			}
-			baselineAccumulator.patterns.add(new PatternRule(pattern.regexp(), flags));
+			baselineAccumulator.patterns.add(new PatternRule(pattern.regexp()));
 		}
 	}
 

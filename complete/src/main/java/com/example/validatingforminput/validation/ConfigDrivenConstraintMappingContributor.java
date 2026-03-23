@@ -25,7 +25,6 @@ import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
 
 import jakarta.validation.Payload;
-import jakarta.validation.constraints.Pattern;
 
 public class ConfigDrivenConstraintMappingContributor implements ConstraintMappingContributor {
 
@@ -154,11 +153,7 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 			}
 		}
 		for (PatternRule patternRule : effectiveConstraints.patterns()) {
-			PatternDef patternDef = new PatternDef().regexp(patternRule.regex());
-			if (!patternRule.flags().isEmpty()) {
-				patternDef.flags(patternRule.flags().toArray(Pattern.Flag[]::new));
-			}
-			applyConstraint(propertyContext, patternDef, patternRule.message());
+			applyConstraint(propertyContext, new PatternDef().regexp(patternRule.regex()), patternRule.message());
 		}
 		for (ExtensionRegexRule extensionRule : effectiveConstraints.extensionRules()) {
 			applyConstraint(

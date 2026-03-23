@@ -8,8 +8,6 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
-import jakarta.validation.constraints.Pattern;
-
 class ConstraintMergeServiceTests {
 
 	private final ConstraintMergeService mergeService = new ConstraintMergeService();
@@ -64,7 +62,7 @@ class ConstraintMergeServiceTests {
 			null,
 			null,
 			null,
-			List.of(new PatternRule("^[A-Za-z ]+$", java.util.EnumSet.of(Pattern.Flag.CASE_INSENSITIVE)))
+			List.of(new PatternRule("^[A-Za-z ]+$"))
 		);
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getPattern().setRegexes(List.of("^[A-Za-z]+$"));
@@ -211,7 +209,7 @@ class ConstraintMergeServiceTests {
 			null,
 			null,
 			null,
-			List.of(new PatternRule("^[A-Za-z ]+$", java.util.EnumSet.of(Pattern.Flag.CASE_INSENSITIVE)))
+			List.of(new PatternRule("^[A-Za-z ]+$"))
 		);
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getPattern().setRegexes(List.of("^[A-Za-z]+$"));
@@ -233,18 +231,16 @@ class ConstraintMergeServiceTests {
 			null,
 			null,
 			null,
-			List.of(new PatternRule("^[A-Za-z]+$", java.util.EnumSet.of(Pattern.Flag.CASE_INSENSITIVE)))
+			List.of(new PatternRule("^[A-Za-z]+$"))
 		);
 		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
 		constraints.getPattern().setRegexes(List.of("^[A-Za-z]+$"));
-		constraints.getPattern().setFlags(List.of("CASE_INSENSITIVE"));
 		constraints.getPattern().setMessage("Letters only");
 
 		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
 
 		assertThat(effective.patterns()).singleElement().satisfies(patternRule -> {
 			assertThat(patternRule.regex()).isEqualTo("^[A-Za-z]+$");
-			assertThat(patternRule.flags()).containsExactly(Pattern.Flag.CASE_INSENSITIVE);
 			assertThat(patternRule.message()).isEqualTo("Letters only");
 		});
 	}
@@ -392,34 +388,6 @@ class ConstraintMergeServiceTests {
 		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "extensions"))
 			.isInstanceOf(InvalidConstraintConfigurationException.class)
 			.hasMessageContaining("regex could not be compiled");
-	}
-
-	@Test
-	void shouldApplyConfiguredPatternFlags() {
-		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
-		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
-		constraints.getPattern().setRegexes(List.of("^[a-z]+$"));
-		constraints.getPattern().setFlags(List.of("CASE_INSENSITIVE", "MULTILINE"));
-
-		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "anyField");
-
-		assertThat(effective.patterns()).hasSize(1);
-		assertThat(effective.patterns().getFirst().regex()).isEqualTo("^[a-z]+$");
-		assertThat(effective.patterns().getFirst().flags()).containsExactlyInAnyOrder(
-			Pattern.Flag.CASE_INSENSITIVE, Pattern.Flag.MULTILINE);
-	}
-
-	@Test
-	void shouldFailWhenConfiguredPatternFlagIsInvalid() {
-		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
-		ValidationProperties.Constraints constraints = new ValidationProperties.Constraints();
-		constraints.getPattern().setRegexes(List.of("^[a-z]+$"));
-		constraints.getPattern().setFlags(List.of("NOT_A_REAL_FLAG"));
-
-		assertThatThrownBy(() -> mergeService.merge(baseline, constraints, "AnyClass", "anyField"))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Invalid pattern flag")
-			.hasMessageContaining("NOT_A_REAL_FLAG");
 	}
 
 	private void assertBound(NumericBound bound, String expectedValue, boolean expectedInclusive) {
