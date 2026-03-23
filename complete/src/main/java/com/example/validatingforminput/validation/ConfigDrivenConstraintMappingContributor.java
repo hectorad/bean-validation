@@ -1,8 +1,6 @@
 package com.example.validatingforminput.validation;
 
 import java.lang.annotation.Annotation;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -23,6 +21,7 @@ import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
+import org.springframework.core.annotation.AnnotationUtils;
 
 import jakarta.validation.Payload;
 
@@ -222,28 +221,16 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 	@SuppressWarnings({ "rawtypes", "unchecked" })
 	private ConstraintDef<?, ?> toConstraintDefinition(Annotation annotation) {
 		GenericConstraintDef constraintDefinition = new GenericConstraintDef(annotation.annotationType());
-		for (Method attribute : annotation.annotationType().getDeclaredMethods()) {
-			Object value = readAnnotationAttribute(annotation, attribute);
-			switch (attribute.getName()) {
+		for (Map.Entry<String, Object> attribute : AnnotationUtils.getAnnotationAttributes(annotation, false, true).entrySet()) {
+			Object value = attribute.getValue();
+			switch (attribute.getKey()) {
 				case "message" -> constraintDefinition.message((String) value);
 				case "groups" -> constraintDefinition.groups((Class<?>[]) value);
 				case "payload" -> constraintDefinition.payload((Class<? extends Payload>[]) value);
-				default -> constraintDefinition.param(attribute.getName(), copyAnnotationValue(value));
+				default -> constraintDefinition.param(attribute.getKey(), copyAnnotationValue(value));
 			}
 		}
 		return constraintDefinition;
-	}
-
-	private Object readAnnotationAttribute(Annotation annotation, Method attribute) {
-		try {
-			return attribute.invoke(annotation);
-		}
-		catch (IllegalAccessException | InvocationTargetException exception) {
-			throw new IllegalStateException(
-				"Unable to read annotation attribute " + attribute.getName()
-					+ " from " + annotation.annotationType().getName(),
-				exception);
-		}
 	}
 
 	private Object copyAnnotationValue(Object value) {

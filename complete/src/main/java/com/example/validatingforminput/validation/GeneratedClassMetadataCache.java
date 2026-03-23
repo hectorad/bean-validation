@@ -1,12 +1,12 @@
 package com.example.validatingforminput.validation;
 
+import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.AnnotatedArrayType;
 import java.lang.reflect.AnnotatedElement;
 import java.lang.reflect.AnnotatedParameterizedType;
 import java.lang.reflect.AnnotatedType;
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -21,6 +21,10 @@ import java.util.Set;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.BeanUtils;
+import org.springframework.core.annotation.AnnotationUtils;
+import org.springframework.util.ClassUtils;
+import org.springframework.util.ReflectionUtils;
 import org.springframework.util.StringUtils;
 
 import jakarta.validation.Constraint;
@@ -154,22 +158,17 @@ public class GeneratedClassMetadataCache {
 
 	private Class<?> resolveClass(String className) {
 		try {
-			return Class.forName(className);
+			return ClassUtils.forName(className, ClassUtils.getDefaultClassLoader());
 		}
-		catch (ClassNotFoundException exception) {
+		catch (ClassNotFoundException | LinkageError exception) {
 			throw new IllegalStateException("Configured class was not found: " + className, exception);
 		}
 	}
 
 	private Field resolveField(Class<?> clazz, String className, String fieldName) {
-		Class<?> current = clazz;
-		while (current != null && current != Object.class) {
-			try {
-				return current.getDeclaredField(fieldName);
-			}
-			catch (NoSuchFieldException ignored) {
-				current = current.getSuperclass();
-			}
+		Field field = ReflectionUtils.findField(clazz, fieldName);
+		if (field != null) {
+			return field;
 		}
 		throw new IllegalStateException(
 			"Configured field was not found. class=" + className + ", field=" + fieldName);
@@ -265,33 +264,39 @@ public class GeneratedClassMetadataCache {
 		if (valueMethod == null) {
 			return;
 		}
+		Annotation[] nestedAnnotations;
 		try {
-			for (Annotation nestedAnnotation : (Annotation[]) valueMethod.invoke(annotation)) {
-				collectPassthroughConstraintAnnotation(nestedAnnotation, passthroughAnnotations);
-			}
+			ReflectionUtils.makeAccessible(valueMethod);
+			nestedAnnotations = (Annotation[]) ReflectionUtils.invokeMethod(valueMethod, annotation);
 		}
-		catch (IllegalAccessException | InvocationTargetException exception) {
-			throw new IllegalStateException(
-				"Unable to inspect container constraint annotation: " + annotationType.getName(),
-				exception);
+		catch (RuntimeException exception) {
+			Object value = AnnotationUtils.getValue(annotation, AnnotationUtils.VALUE);
+			if (!(value instanceof Annotation[] extractedAnnotations)) {
+				throw new IllegalStateException(
+					"Unable to inspect container constraint annotation: " + annotationType.getName(),
+					exception);
+			}
+			nestedAnnotations = extractedAnnotations;
+		}
+
+		for (Annotation nestedAnnotation : nestedAnnotations) {
+			collectPassthroughConstraintAnnotation(nestedAnnotation, passthroughAnnotations);
 		}
 	}
 
 	private Method findConstraintContainerValueMethod(Class<? extends Annotation> annotationType) {
-		try {
-			Method valueMethod = annotationType.getMethod("value");
-			Class<?> returnType = valueMethod.getReturnType();
-			if (!returnType.isArray() || !Annotation.class.isAssignableFrom(returnType.getComponentType())) {
-				return null;
-			}
-			@SuppressWarnings("unchecked")
-			Class<? extends Annotation> nestedAnnotationType =
-				(Class<? extends Annotation>) returnType.getComponentType();
-			return nestedAnnotationType.isAnnotationPresent(Constraint.class) ? valueMethod : null;
-		}
-		catch (NoSuchMethodException exception) {
+		Method valueMethod = ReflectionUtils.findMethod(annotationType, AnnotationUtils.VALUE);
+		if (valueMethod == null) {
 			return null;
 		}
+		Class<?> returnType = valueMethod.getReturnType();
+		if (!returnType.isArray() || !Annotation.class.isAssignableFrom(returnType.getComponentType())) {
+			return null;
+		}
+		@SuppressWarnings("unchecked")
+		Class<? extends Annotation> nestedAnnotationType =
+			(Class<? extends Annotation>) returnType.getComponentType();
+		return nestedAnnotationType.isAnnotationPresent(Constraint.class) ? valueMethod : null;
 	}
 
 	private void validateConstraints(
@@ -305,7 +310,7 @@ public class GeneratedClassMetadataCache {
 		}
 
 		Class<?> rawFieldType = field.getType();
-		Class<?> fieldType = wrapPrimitive(rawFieldType);
+		Class<?> fieldType = ClassUtils.resolvePrimitiveIfNecessary(rawFieldType);
 		String fieldName = field.getName();
 		boolean extensionsConfigured = hasConfiguredExtensions(constraints);
 
@@ -369,25 +374,12 @@ public class GeneratedClassMetadataCache {
 	}
 
 	private Optional<Method> findGetter(Class<?> clazz, String fieldName) {
-		String capitalizedFieldName = StringUtils.capitalize(fieldName);
-		List<String> getterNames = List.of("get" + capitalizedFieldName, "is" + capitalizedFieldName);
-
-		Class<?> current = clazz;
-		while (current != null && current != Object.class) {
-			for (String getterName : getterNames) {
-				try {
-					Method method = current.getDeclaredMethod(getterName);
-					if (method.getParameterCount() == 0) {
-						return Optional.of(method);
-					}
-				}
-				catch (NoSuchMethodException ignored) {
-					// Continue scanning up the class hierarchy.
-				}
-			}
-			current = current.getSuperclass();
+		PropertyDescriptor propertyDescriptor = BeanUtils.getPropertyDescriptor(clazz, fieldName);
+		if (propertyDescriptor == null) {
+			return Optional.empty();
 		}
-		return Optional.empty();
+		Method readMethod = propertyDescriptor.getReadMethod();
+		return (readMethod != null && readMethod.getParameterCount() == 0) ? Optional.of(readMethod) : Optional.empty();
 	}
 
 	private NumericBound parseDecimalAnnotationBound(
@@ -463,37 +455,6 @@ public class GeneratedClassMetadataCache {
 			|| CharSequence.class.isAssignableFrom(fieldType)
 			|| java.util.Collection.class.isAssignableFrom(fieldType)
 			|| java.util.Map.class.isAssignableFrom(fieldType);
-	}
-
-	private Class<?> wrapPrimitive(Class<?> fieldType) {
-		if (!fieldType.isPrimitive()) {
-			return fieldType;
-		}
-		if (fieldType == boolean.class) {
-			return Boolean.class;
-		}
-		if (fieldType == byte.class) {
-			return Byte.class;
-		}
-		if (fieldType == short.class) {
-			return Short.class;
-		}
-		if (fieldType == int.class) {
-			return Integer.class;
-		}
-		if (fieldType == long.class) {
-			return Long.class;
-		}
-		if (fieldType == float.class) {
-			return Float.class;
-		}
-		if (fieldType == double.class) {
-			return Double.class;
-		}
-		if (fieldType == char.class) {
-			return Character.class;
-		}
-		return fieldType;
 	}
 
 	private InvalidConstraintConfigurationException unsupportedConstraint(
