@@ -3,6 +3,8 @@ package com.example.validatingforminput.validation;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import java.util.Arrays;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
@@ -31,11 +33,11 @@ class ValidationAutoConfigurationDiscoveryTests {
 			assertThat(context.containsBean("configDrivenValidationConfigurationCustomizer")).isTrue();
 			assertThat(context.getBean("configDrivenValidationConfigurationCustomizer", ValidationConfigurationCustomizer.class))
 				.isNotNull();
-			assertThat(context.getBeansOfType(ConfigDrivenConstraintMappingContributor.class)).hasSize(1);
-			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
-			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).hasSize(1);
+			assertThat(userBeanNamesForType(context, ConfigDrivenConstraintMappingContributor.class)).hasSize(1);
+			assertThat(userBeanNamesForType(context, ConstraintMergeService.class)).hasSize(1);
+			assertThat(userBeanNamesForType(context, GeneratedClassMetadataCache.class)).hasSize(1);
 			assertThat(context.getBeansOfType(ExternalPayloadValidator.class)).hasSize(1);
-			assertThat(context.getBean("defaultValidator", LocalValidatorFactoryBean.class))
+			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.containsBean("personValidationService")).isFalse();
 			assertThat(context.containsBean("webController")).isFalse();
@@ -49,7 +51,8 @@ class ValidationAutoConfigurationDiscoveryTests {
 			.run("--com.ampp.validation-enabled=false")) {
 			LocalValidatorFactoryBean validator = context.getBean("defaultValidator", LocalValidatorFactoryBean.class);
 
-			assertThat(validator).isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
+			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
+				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
 			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNotNull();
@@ -64,7 +67,7 @@ class ValidationAutoConfigurationDiscoveryTests {
 			.web(WebApplicationType.NONE)
 			.run()) {
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).hasSize(1);
-			Object contributor = context.getBean(ConfigDrivenConstraintMappingContributor.class);
+			Object contributor = context.getBean(targetBeanName(context, "configDrivenConstraintMappingContributor"));
 			assertThat(ReflectionTestUtils.getField(contributor, "constraintMergeService"))
 				.isSameAs(context.getBean("customConstraintMergeService"));
 		}
@@ -141,5 +144,16 @@ class ValidationAutoConfigurationDiscoveryTests {
 		LocalValidatorFactoryBean customDefaultValidator() {
 			return new LocalValidatorFactoryBean();
 		}
+	}
+
+	private static String[] userBeanNamesForType(ConfigurableApplicationContext context, Class<?> type) {
+		return Arrays.stream(context.getBeanNamesForType(type))
+			.filter(beanName -> !beanName.startsWith("scopedTarget."))
+			.toArray(String[]::new);
+	}
+
+	private static String targetBeanName(ConfigurableApplicationContext context, String beanName) {
+		String scopedTargetBeanName = "scopedTarget." + beanName;
+		return context.containsBean(scopedTargetBeanName) ? scopedTargetBeanName : beanName;
 	}
 }

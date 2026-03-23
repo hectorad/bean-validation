@@ -20,13 +20,10 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
 
     private final ValidationProperties validationProperties;
 
-    private final ValidationProperties.RequestValidationBypass requestValidationBypass;
-
     private final ExecutableValidator executableValidator = new RequestAwareExecutableValidator();
 
     public RequestAwareValidatingLocalValidatorFactoryBean(ValidationProperties validationProperties) {
         this.validationProperties = validationProperties;
-        this.requestValidationBypass = validationProperties.getRequestValidationBypass();
     }
 
     @Override
@@ -81,6 +78,7 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
             return true;
         }
 
+        ValidationProperties.RequestValidationBypass requestValidationBypass = validationProperties.getRequestValidationBypass();
         if (!requestValidationBypass.isEnabled()) {
             return false;
         }

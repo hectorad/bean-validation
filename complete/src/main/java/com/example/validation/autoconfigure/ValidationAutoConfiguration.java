@@ -12,6 +12,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.autoconfigure.validation.ValidationConfigurationCustomizer;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.boot.validation.MessageInterpolatorFactory;
+import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
@@ -28,6 +29,7 @@ public class ValidationAutoConfiguration {
 
     @Bean(name = "defaultValidator")
     @Primary
+    @RefreshScope
     @ConditionalOnMissingBean(name = "defaultValidator")
     public LocalValidatorFactoryBean defaultValidator(
             ApplicationContext applicationContext,
@@ -38,12 +40,7 @@ public class ValidationAutoConfiguration {
             log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
                     + "No constraints will be enforced on any field. ***");
         }
-        RequestAwareValidatingLocalValidatorFactoryBean factoryBean =
-                new RequestAwareValidatingLocalValidatorFactoryBean(validationProperties);
-        factoryBean.setConfigurationInitializer(configuration ->
-                customizers.orderedStream().forEach(customizer -> customizer.customize(configuration)));
-        factoryBean.setMessageInterpolator(new MessageInterpolatorFactory(applicationContext).getObject());
-        return factoryBean;
+        return configureDefaultValidator(applicationContext, customizers, validationProperties);
     }
 
     @Bean
@@ -56,6 +53,7 @@ public class ValidationAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
+    @RefreshScope
     public GeneratedClassMetadataCache generatedClassMetadataCache(ValidationProperties validationProperties) {
         return new GeneratedClassMetadataCache(validationProperties, validationProperties.isFailOnError());
     }
@@ -63,6 +61,7 @@ public class ValidationAutoConfiguration {
     @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
+    @RefreshScope
     public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
             ValidationProperties validationProperties,
             GeneratedClassMetadataCache generatedClassMetadataCache,
@@ -96,12 +95,17 @@ public class ValidationAutoConfiguration {
     }
 
     @Bean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public ValidationConfigurationCustomizer configDrivenValidationConfigurationCustomizer(
-            ConfigDrivenConstraintMappingContributor contributor
+            ValidationProperties validationProperties,
+            ObjectProvider<ConfigDrivenConstraintMappingContributor> contributorProvider,
+            ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
+            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider
     ) {
         java.util.concurrent.atomic.AtomicBoolean warnedUnsupportedProvider = new java.util.concurrent.atomic.AtomicBoolean();
         return configuration -> {
+            if (!validationProperties.isValidationEnabled()) {
+                return;
+            }
             if (!(configuration instanceof HibernateValidatorConfiguration hibernateConfiguration)) {
                 if (warnedUnsupportedProvider.compareAndSet(false, true)) {
                     log.warn(
@@ -110,11 +114,46 @@ public class ValidationAutoConfiguration {
                 }
                 return;
             }
+            ConfigDrivenConstraintMappingContributor contributor = contributorProvider
+                    .getIfAvailable(() -> runtimeConstraintMappingContributor(
+                            validationProperties,
+                            generatedClassMetadataCacheProvider,
+                            constraintMergeServiceProvider));
             contributor.createConstraintMappings(() -> {
                 var mapping = hibernateConfiguration.createConstraintMapping();
                 hibernateConfiguration.addMapping(mapping);
                 return mapping;
             });
         };
+    }
+
+    private static RequestAwareValidatingLocalValidatorFactoryBean configureDefaultValidator(
+            ApplicationContext applicationContext,
+            ObjectProvider<ValidationConfigurationCustomizer> customizers,
+            ValidationProperties validationProperties
+    ) {
+        RequestAwareValidatingLocalValidatorFactoryBean factoryBean =
+                new RequestAwareValidatingLocalValidatorFactoryBean(validationProperties);
+        factoryBean.setConfigurationInitializer(configuration ->
+                customizers.orderedStream().forEach(customizer -> customizer.customize(configuration)));
+        factoryBean.setMessageInterpolator(new MessageInterpolatorFactory(applicationContext).getObject());
+        return factoryBean;
+    }
+
+    private static ConfigDrivenConstraintMappingContributor runtimeConstraintMappingContributor(
+            ValidationProperties validationProperties,
+            ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
+            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider
+    ) {
+        boolean failOnError = validationProperties.isFailOnError();
+        GeneratedClassMetadataCache generatedClassMetadataCache = generatedClassMetadataCacheProvider
+                .getIfAvailable(() -> new GeneratedClassMetadataCache(validationProperties, failOnError));
+        ConstraintMergeService constraintMergeService = constraintMergeServiceProvider
+                .getIfAvailable(ConstraintMergeService::new);
+        return new ConfigDrivenConstraintMappingContributor(
+                validationProperties,
+                generatedClassMetadataCache,
+                constraintMergeService,
+                failOnError);
     }
 }
