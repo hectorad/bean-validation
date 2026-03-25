@@ -29,6 +29,9 @@ public class ValidationProperties {
     private KafkaConsumerValidation kafkaConsumerValidation = new KafkaConsumerValidation();
 
     @Valid
+    private MessageValidation messageValidation = new MessageValidation();
+
+    @Valid
     private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
 
     public boolean isValidationEnabled() {
@@ -69,6 +72,14 @@ public class ValidationProperties {
 
     public void setKafkaConsumerValidation(KafkaConsumerValidation kafkaConsumerValidation) {
         this.kafkaConsumerValidation = defaultValue(kafkaConsumerValidation, KafkaConsumerValidation::new);
+    }
+
+    public MessageValidation getMessageValidation() {
+        return messageValidation;
+    }
+
+    public void setMessageValidation(MessageValidation messageValidation) {
+        this.messageValidation = defaultValue(messageValidation, MessageValidation::new);
     }
 
     public List<ClassMapping> getBusinessValidationOverride() {
@@ -130,6 +141,19 @@ public class ValidationProperties {
     }
 
     public static class KafkaConsumerValidation {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    public static class MessageValidation {
 
         private boolean enabled = false;
 

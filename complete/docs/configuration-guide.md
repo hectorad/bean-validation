@@ -14,6 +14,7 @@ For a deep dive into the internal pipeline, see [validation-constraint-mapping.m
 - [Custom Messages](#custom-messages)
 - [Extensions Validation](#extensions-validation)
 - [Custom Contributors](#custom-contributors)
+- [Message Validation](#message-validation)
 - [Error Handling](#error-handling)
 - [Architecture Overview](#architecture-overview)
 - [Troubleshooting](#troubleshooting)
@@ -28,6 +29,7 @@ This framework provides a config-driven validation override system built on Jaka
 
 - Override or strengthen `@NotNull`, `@NotBlank`, `@Min`, `@Max`, `@DecimalMin`, `@DecimalMax`, `@Size`, and `@Pattern` constraints from YAML
 - Add JSONPath + regex validation rules for `Map<String, Object>` extension fields
+- Validate Spring `Message<?>` payloads with a reusable `MessageHandler` decorator
 - Merge strategy that always selects the stricter constraint (configuration cannot weaken baseline annotations)
 - Pluggable contributor SPI (`FieldConstraintContributor`) for programmatic constraint sources
 - All configuration is validated eagerly at startup; invalid config prevents the application from booting
@@ -46,6 +48,7 @@ This framework provides a config-driven validation override system built on Jaka
 | Spring Boot | 3.5.x | `spring-boot-starter-validation` required |
 | Hibernate Validator | (transitive) | Included via `spring-boot-starter-validation` |
 | JSONPath | (optional) | `com.jayway.jsonpath:json-path`, only needed for `extensions` constraint |
+| Spring Messaging | (transitive/optional) | `org.springframework:spring-messaging`, used when wrapping `MessageHandler` delegates for payload validation |
 
 **Maven dependencies:**
 
@@ -173,6 +176,7 @@ Each class mapping identifies a Java class by its fully-qualified name and lists
 | `request-validation-bypass.enabled` | `boolean` | `false` | Enables a per-request validation bypass controlled by a trusted request header. |
 | `request-validation-bypass.header-name` | `String` | `X-Skip-Validation` | Header name checked on the current servlet request. |
 | `request-validation-bypass.header-value` | `String` | `true` | Exact header value required to bypass validation. |
+| `message-validation.enabled` | `boolean` | `false` | Enables auto-configuration of `MessageValidationHandlerFactory` for wrapping user-supplied Spring `MessageHandler` delegates. |
 
 ```yaml
 com.ampp:
@@ -186,6 +190,42 @@ com.ampp:
 Precedence is explicit: `validation-enabled=false` disables validation everywhere first. When global validation remains enabled, the request-bypass header can skip validation only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
 
 **Trust boundary:** Treat the bypass header as an internal escape hatch. External traffic should not be allowed to set it directly; strip or overwrite it at the gateway or proxy layer before requests reach the application.
+
+---
+
+### Message Validation
+
+Enable the message-validation module when you want to validate `Message<?>` payloads before a Spring `MessageHandler` delegate processes them.
+
+```yaml
+com.ampp:
+  message-validation:
+    enabled: true
+```
+
+The auto-configuration contributes a `messageValidationHandlerFactory` bean. It does not auto-create handlers, channels, or flows. Use the factory to wrap your own delegate `MessageHandler`.
+
+The resulting decorator validates `message.getPayload()` with the existing `ExternalPayloadValidator`, forwards the original `Message<?>` unchanged when valid, and throws `MessagePayloadValidationException` when invalid.
+
+Example direct construction:
+
+```java
+@Bean
+MessageHandler validatedHandler(ExternalPayloadValidator externalPayloadValidator, MessageHandler delegate) {
+    return new ValidatingPayloadMessageHandler(delegate, externalPayloadValidator);
+}
+```
+
+Example factory usage:
+
+```java
+@Bean
+MessageHandler validatedHandler(MessageValidationHandlerFactory factory, MessageHandler delegate) {
+    return factory.create(delegate);
+}
+```
+
+Invalid payloads surface through `MessagePayloadValidationException`, which extends `MessageHandlingException` and exposes the `ValidationResult<?>`.
 
 ---
 

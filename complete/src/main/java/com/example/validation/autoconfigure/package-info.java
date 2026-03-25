@@ -7,7 +7,10 @@
 		"feign :: spi",
 		"feign :: runtime",
 		"kafka :: spi",
-		"kafka :: runtime"
+		"kafka :: runtime",
+		"messaging :: api",
+		"messaging :: spi",
+		"messaging :: runtime"
 	}
 )
 package com.example.validation.autoconfigure;

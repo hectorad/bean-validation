@@ -1,3 +1,4 @@
 com.example.validation.autoconfigure.ValidationAutoConfiguration
 com.example.validation.autoconfigure.FeignValidationAutoConfiguration
 com.example.validation.autoconfigure.KafkaValidationAutoConfiguration
+com.example.validation.autoconfigure.MessageValidationAutoConfiguration
