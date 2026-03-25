@@ -1,6 +1,15 @@
 package com.example.validation.autoconfigure;
 
-import com.example.validatingforminput.validation.*;
+import com.example.validation.core.api.ExternalPayloadValidator;
+import com.example.validation.core.internal.BeanValidationExternalPayloadValidator;
+import com.example.validation.core.internal.ConfigDrivenConstraintMappingContributor;
+import com.example.validation.core.internal.ConstraintMergeService;
+import com.example.validation.core.internal.GeneratedClassMetadataCache;
+import com.example.validation.core.internal.PropertiesFieldConstraintContributor;
+import com.example.validation.core.internal.RequestAwareValidatingLocalValidatorFactoryBean;
+import com.example.validation.core.internal.ValidationProperties;
+import com.example.validation.core.internal.ValidationTroubleshootingAnalyzer;
+import com.example.validation.core.spi.FieldConstraintContributor;
 import org.hibernate.validator.HibernateValidatorConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +28,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import jakarta.validation.Validator;
+
+import java.util.List;
 
 @AutoConfiguration(before = org.springframework.boot.autoconfigure.validation.ValidationAutoConfiguration.class)
 @ConditionalOnClass({ValidationConfigurationCustomizer.class, HibernateValidatorConfiguration.class})
@@ -59,18 +70,27 @@ public class ValidationAutoConfiguration {
     }
 
     @Bean
+    @ConditionalOnMissingBean(name = "propertiesFieldConstraintContributor")
+    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
+    @RefreshScope
+    public FieldConstraintContributor propertiesFieldConstraintContributor(ValidationProperties validationProperties) {
+        return new PropertiesFieldConstraintContributor(validationProperties);
+    }
+
+    @Bean
     @ConditionalOnMissingBean
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     @RefreshScope
     public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
             ValidationProperties validationProperties,
             GeneratedClassMetadataCache generatedClassMetadataCache,
-            ConstraintMergeService constraintMergeService
+            ConstraintMergeService constraintMergeService,
+            ObjectProvider<FieldConstraintContributor> fieldConstraintContributors
     ) {
         return new ConfigDrivenConstraintMappingContributor(
-                validationProperties,
                 generatedClassMetadataCache,
                 constraintMergeService,
+                defaultFieldConstraintContributors(validationProperties, fieldConstraintContributors),
                 validationProperties.isFailOnError());
     }
 
@@ -99,7 +119,8 @@ public class ValidationAutoConfiguration {
             ValidationProperties validationProperties,
             ObjectProvider<ConfigDrivenConstraintMappingContributor> contributorProvider,
             ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
-            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider
+            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
+            ObjectProvider<FieldConstraintContributor> fieldConstraintContributors
     ) {
         java.util.concurrent.atomic.AtomicBoolean warnedUnsupportedProvider = new java.util.concurrent.atomic.AtomicBoolean();
         return configuration -> {
@@ -118,7 +139,8 @@ public class ValidationAutoConfiguration {
                     .getIfAvailable(() -> runtimeConstraintMappingContributor(
                             validationProperties,
                             generatedClassMetadataCacheProvider,
-                            constraintMergeServiceProvider));
+                            constraintMergeServiceProvider,
+                            fieldConstraintContributors));
             contributor.createConstraintMappings(() -> {
                 var mapping = hibernateConfiguration.createConstraintMapping();
                 hibernateConfiguration.addMapping(mapping);
@@ -143,7 +165,8 @@ public class ValidationAutoConfiguration {
     private static ConfigDrivenConstraintMappingContributor runtimeConstraintMappingContributor(
             ValidationProperties validationProperties,
             ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
-            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider
+            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
+            ObjectProvider<FieldConstraintContributor> fieldConstraintContributors
     ) {
         boolean failOnError = validationProperties.isFailOnError();
         GeneratedClassMetadataCache generatedClassMetadataCache = generatedClassMetadataCacheProvider
@@ -151,9 +174,19 @@ public class ValidationAutoConfiguration {
         ConstraintMergeService constraintMergeService = constraintMergeServiceProvider
                 .getIfAvailable(ConstraintMergeService::new);
         return new ConfigDrivenConstraintMappingContributor(
-                validationProperties,
                 generatedClassMetadataCache,
                 constraintMergeService,
+                defaultFieldConstraintContributors(validationProperties, fieldConstraintContributors),
                 failOnError);
+    }
+
+    private static List<FieldConstraintContributor> defaultFieldConstraintContributors(
+            ValidationProperties validationProperties,
+            ObjectProvider<FieldConstraintContributor> fieldConstraintContributors
+    ) {
+        List<FieldConstraintContributor> contributors = fieldConstraintContributors.orderedStream().toList();
+        return contributors.isEmpty()
+                ? List.of(new PropertiesFieldConstraintContributor(validationProperties))
+                : contributors;
     }
 }

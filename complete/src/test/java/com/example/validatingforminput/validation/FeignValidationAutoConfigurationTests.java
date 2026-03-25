@@ -1,4 +1,6 @@
-package com.example.validatingforminput.validation;
+package com.example.validation.core.internal;
+
+import com.example.validation.core.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -14,10 +16,10 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 
 import com.example.validation.autoconfigure.FeignValidationAutoConfiguration;
 import com.example.validation.autoconfigure.ValidationAutoConfiguration;
-import com.example.validatingforminput.validation.feign.DefaultFeignValidationCapabilityFactory;
-import com.example.validatingforminput.validation.feign.FeignValidationCapabilityFactory;
-import com.example.validatingforminput.validation.feign.FeignResponseValidationException;
-import com.example.validatingforminput.validation.feign.ValidatingFeignCapability;
+import com.example.validation.feign.internal.DefaultFeignValidationCapabilityFactory;
+import com.example.validation.feign.spi.FeignValidationCapabilityFactory;
+import com.example.validation.feign.api.FeignResponseValidationException;
+import com.example.validation.feign.internal.ValidatingFeignCapability;
 
 import feign.Capability;
 import feign.Feign;

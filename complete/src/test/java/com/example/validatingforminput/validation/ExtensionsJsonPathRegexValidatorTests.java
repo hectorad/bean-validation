@@ -1,4 +1,6 @@
-package com.example.validatingforminput.validation;
+package com.example.validation.core.internal;
+
+import com.example.validation.core.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

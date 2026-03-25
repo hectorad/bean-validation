@@ -29,7 +29,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import com.example.validatingforminput.validation.ExternalPayloadValidator;
+import com.example.validation.core.api.ExternalPayloadValidator;
 
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;

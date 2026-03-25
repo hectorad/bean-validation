@@ -1,4 +1,6 @@
-package com.example.validatingforminput.validation;
+package com.example.validation.core.internal;
+
+import com.example.validation.core.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -17,7 +19,7 @@ import jakarta.validation.constraints.Size;
 @SpringBootTest(
     classes = ValidatingFormInputApplication.class,
     properties = {
-        "com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.validation.ExternalPayloadValidatorIntegrationTests$PayloadTarget",
+        "com.ampp.business-validation-override[0].full-class-name=com.example.validation.core.internal.ExternalPayloadValidatorIntegrationTests$PayloadTarget",
         "com.ampp.business-validation-override[0].fields[0].field-name=name",
         "com.ampp.business-validation-override[0].fields[0].constraints.size.min.value=5"
     }

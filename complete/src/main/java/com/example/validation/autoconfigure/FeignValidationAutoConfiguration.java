@@ -1,7 +1,7 @@
 package com.example.validation.autoconfigure;
 
-import com.example.validatingforminput.validation.feign.DefaultFeignValidationCapabilityFactory;
-import com.example.validatingforminput.validation.feign.FeignValidationCapabilityFactory;
+import com.example.validation.feign.internal.DefaultFeignValidationCapabilityFactory;
+import com.example.validation.feign.spi.FeignValidationCapabilityFactory;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;

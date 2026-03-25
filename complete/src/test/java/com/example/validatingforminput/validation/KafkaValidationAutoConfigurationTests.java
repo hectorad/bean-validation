@@ -1,4 +1,6 @@
-package com.example.validatingforminput.validation;
+package com.example.validation.core.internal;
+
+import com.example.validation.core.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -14,8 +16,8 @@ import org.springframework.kafka.listener.RecordInterceptor;
 
 import com.example.validation.autoconfigure.KafkaValidationAutoConfiguration;
 import com.example.validation.autoconfigure.ValidationAutoConfiguration;
-import com.example.validatingforminput.validation.kafka.KafkaValidationFailureHandler;
-import com.example.validatingforminput.validation.kafka.ValidatingKafkaRecordInterceptor;
+import com.example.validation.kafka.spi.KafkaValidationFailureHandler;
+import com.example.validation.kafka.internal.ValidatingKafkaRecordInterceptor;
 
 class KafkaValidationAutoConfigurationTests {
 

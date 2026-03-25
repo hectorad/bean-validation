@@ -1,9 +1,9 @@
 package com.example.validation.autoconfigure;
 
-import com.example.validatingforminput.validation.ExternalPayloadValidator;
-import com.example.validatingforminput.validation.kafka.KafkaValidationFailureHandler;
-import com.example.validatingforminput.validation.kafka.LoggingKafkaValidationFailureHandler;
-import com.example.validatingforminput.validation.kafka.ValidatingKafkaRecordInterceptor;
+import com.example.validation.core.api.ExternalPayloadValidator;
+import com.example.validation.kafka.spi.KafkaValidationFailureHandler;
+import com.example.validation.kafka.internal.LoggingKafkaValidationFailureHandler;
+import com.example.validation.kafka.internal.ValidatingKafkaRecordInterceptor;
 import org.springframework.boot.autoconfigure.AutoConfiguration;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;

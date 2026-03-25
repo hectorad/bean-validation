@@ -18,6 +18,7 @@
 		<java.version>21</java.version>
 		<feign.version>13.6</feign.version>
 		<spring-cloud.version>2025.0.0</spring-cloud.version>
+		<spring-modulith.version>1.4.1</spring-modulith.version>
 	</properties>
 
 	<dependencyManagement>
@@ -26,6 +27,13 @@
 				<groupId>org.springframework.cloud</groupId>
 				<artifactId>spring-cloud-dependencies</artifactId>
 				<version>${spring-cloud.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+			<dependency>
+				<groupId>org.springframework.modulith</groupId>
+				<artifactId>spring-modulith-bom</artifactId>
+				<version>${spring-modulith.version}</version>
 				<type>pom</type>
 				<scope>import</scope>
 			</dependency>
@@ -58,6 +66,10 @@
 			<artifactId>spring-cloud-context</artifactId>
 		</dependency>
 		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-api</artifactId>
+		</dependency>
+		<dependency>
 			<groupId>io.github.openfeign</groupId>
 			<artifactId>feign-core</artifactId>
 			<version>${feign.version}</version>
@@ -72,6 +84,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-test</artifactId>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.springframework.modulith</groupId>
+			<artifactId>spring-modulith-core</artifactId>
 			<scope>test</scope>
 		</dependency>
 	</dependencies>

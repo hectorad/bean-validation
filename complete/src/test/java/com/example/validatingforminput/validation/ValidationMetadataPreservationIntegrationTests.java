@@ -1,4 +1,6 @@
-package com.example.validatingforminput.validation;
+package com.example.validation.core.internal;
+
+import com.example.validation.core.api.*;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -34,17 +36,17 @@ import jakarta.validation.constraints.Pattern;
 @SpringBootTest(
 	classes = ValidatingFormInputApplication.class,
 	properties = {
-		"com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.validation.ValidationMetadataPreservationIntegrationTests$EmailTarget",
+		"com.ampp.business-validation-override[0].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$EmailTarget",
 		"com.ampp.business-validation-override[0].fields[0].field-name=email",
 		"com.ampp.business-validation-override[0].fields[0].constraints.not-null.value=true",
-		"com.ampp.business-validation-override[1].full-class-name=com.example.validatingforminput.validation.ValidationMetadataPreservationIntegrationTests$CascadeTarget",
+		"com.ampp.business-validation-override[1].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CascadeTarget",
 		"com.ampp.business-validation-override[1].fields[0].field-name=contact",
 		"com.ampp.business-validation-override[1].fields[0].constraints.not-null.value=true",
-		"com.ampp.business-validation-override[2].full-class-name=com.example.validatingforminput.validation.ValidationMetadataPreservationIntegrationTests$PatternTarget",
+		"com.ampp.business-validation-override[2].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$PatternTarget",
 		"com.ampp.business-validation-override[2].fields[0].field-name=name",
 		"com.ampp.business-validation-override[2].fields[0].constraints.pattern.regexes[0]=^[A-Za-z ]+$",
 		"com.ampp.business-validation-override[2].fields[0].constraints.pattern.message=Configured letters only",
-		"com.ampp.business-validation-override[3].full-class-name=com.example.validatingforminput.validation.ValidationMetadataPreservationIntegrationTests$CustomAttributeTarget",
+		"com.ampp.business-validation-override[3].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CustomAttributeTarget",
 		"com.ampp.business-validation-override[3].fields[0].field-name=code",
 		"com.ampp.business-validation-override[3].fields[0].constraints.not-null.value=true"
 	})
