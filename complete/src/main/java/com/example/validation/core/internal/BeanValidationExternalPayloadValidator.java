@@ -29,14 +29,17 @@ public class BeanValidationExternalPayloadValidator implements ExternalPayloadVa
             return ValidationResult.success(null);
         }
 
-        List<ViolationDetail> violations = validator.validate(value).stream()
+        var violationSet = validator.validate(value);
+        if (violationSet.isEmpty()) {
+            return ValidationResult.success(value);
+        }
+
+        List<ViolationDetail> violations = violationSet.stream()
             .map(this::toViolationDetail)
             .sorted(VIOLATION_ORDER)
             .toList();
 
-        return violations.isEmpty()
-            ? ValidationResult.success(value)
-            : ValidationResult.failure(value, violations);
+        return ValidationResult.failure(value, violations);
     }
 
     private ViolationDetail toViolationDetail(ConstraintViolation<?> violation) {
