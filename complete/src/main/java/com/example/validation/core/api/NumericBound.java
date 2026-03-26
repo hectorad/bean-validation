@@ -16,39 +16,25 @@ public record NumericBound(BigDecimal value, boolean inclusive) {
 	}
 
 	public static NumericBound stricterLower(NumericBound current, NumericBound candidate) {
-		if (candidate == null) {
-			return current;
-		}
-		if (current == null) {
-			return candidate;
-		}
-
-		int comparison = candidate.value.compareTo(current.value);
-		if (comparison > 0) {
-			return candidate;
-		}
-		if (comparison < 0) {
-			return current;
-		}
-		if (!candidate.inclusive && current.inclusive) {
-			return candidate;
-		}
-		return current;
+		return selectStricter(current, candidate, 1);
 	}
 
 	public static NumericBound stricterUpper(NumericBound current, NumericBound candidate) {
+		return selectStricter(current, candidate, -1);
+	}
+
+	private static NumericBound selectStricter(NumericBound current, NumericBound candidate, int stricterDirection) {
 		if (candidate == null) {
 			return current;
 		}
 		if (current == null) {
 			return candidate;
 		}
-
 		int comparison = candidate.value.compareTo(current.value);
-		if (comparison < 0) {
+		if (comparison == stricterDirection) {
 			return candidate;
 		}
-		if (comparison > 0) {
+		if (comparison == -stricterDirection) {
 			return current;
 		}
 		if (!candidate.inclusive && current.inclusive) {

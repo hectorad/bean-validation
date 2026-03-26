@@ -1,15 +1,16 @@
 package com.example.validation.feign.internal;
 
+import com.example.validation.core.api.ExternalPayloadValidator;
+
 import feign.Capability;
 import feign.codec.Decoder;
-import jakarta.validation.Validator;
 
 public class ValidatingFeignCapability implements Capability {
 
-    private final Validator validator;
+    private final ExternalPayloadValidator externalPayloadValidator;
 
-    public ValidatingFeignCapability(Validator validator) {
-        this.validator = validator;
+    public ValidatingFeignCapability(ExternalPayloadValidator externalPayloadValidator) {
+        this.externalPayloadValidator = externalPayloadValidator;
     }
 
     @Override
@@ -17,6 +18,6 @@ public class ValidatingFeignCapability implements Capability {
         if (decoder instanceof ValidatingFeignDecoder) {
             return decoder;
         }
-        return new ValidatingFeignDecoder(decoder, validator);
+        return new ValidatingFeignDecoder(decoder, externalPayloadValidator);
     }
 }

@@ -58,7 +58,8 @@ class FeignValidationAutoConfigurationTests {
     @Test
     void shouldReturnDecodedObjectWhenFeignPayloadIsValid() throws Exception {
         LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-        ValidatingFeignCapability capability = new ValidatingFeignCapability(validatorFactoryBean);
+        BeanValidationExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
         FeignPayload payload = new FeignPayload();
         payload.setName("valid");
 
@@ -72,7 +73,7 @@ class FeignValidationAutoConfigurationTests {
     void shouldThrowValidationExceptionWithSameViolationsAsManualValidation() throws Exception {
         LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
         BeanValidationExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
-        ValidatingFeignCapability capability = new ValidatingFeignCapability(validatorFactoryBean);
+        ValidatingFeignCapability capability = new ValidatingFeignCapability(externalPayloadValidator);
         FeignPayload payload = new FeignPayload();
         payload.setName("");
         ValidationResult<FeignPayload> manualResult = externalPayloadValidator.validate(payload);
@@ -90,7 +91,8 @@ class FeignValidationAutoConfigurationTests {
     @Test
     void shouldCreateCapabilityForManualFeignBuilderUsage() {
         LocalValidatorFactoryBean validatorFactoryBean = validatorFactoryBean();
-        FeignValidationCapabilityFactory factory = new DefaultFeignValidationCapabilityFactory(validatorFactoryBean);
+        BeanValidationExternalPayloadValidator externalPayloadValidator = new BeanValidationExternalPayloadValidator(validatorFactoryBean);
+        FeignValidationCapabilityFactory factory = new DefaultFeignValidationCapabilityFactory(externalPayloadValidator);
 
         Capability capability = factory.create();
 

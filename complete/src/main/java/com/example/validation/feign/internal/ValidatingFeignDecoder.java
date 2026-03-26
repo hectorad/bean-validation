@@ -2,32 +2,23 @@ package com.example.validation.feign.internal;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
-import java.util.Comparator;
-import java.util.List;
 
+import com.example.validation.core.api.ExternalPayloadValidator;
 import com.example.validation.core.api.ValidationResult;
-import com.example.validation.core.api.ViolationDetail;
 import com.example.validation.feign.api.FeignResponseValidationException;
 
 import feign.Response;
 import feign.codec.Decoder;
-import jakarta.validation.ConstraintViolation;
-import jakarta.validation.Validator;
 
 public class ValidatingFeignDecoder implements Decoder {
 
-    private static final Comparator<ViolationDetail> VIOLATION_ORDER = Comparator
-        .comparing(ViolationDetail::propertyPath, Comparator.nullsFirst(String::compareTo))
-        .thenComparing(ViolationDetail::message, Comparator.nullsFirst(String::compareTo))
-        .thenComparing(ViolationDetail::constraintType, Comparator.nullsFirst(String::compareTo));
-
     private final Decoder delegate;
 
-    private final Validator validator;
+    private final ExternalPayloadValidator externalPayloadValidator;
 
-    public ValidatingFeignDecoder(Decoder delegate, Validator validator) {
+    public ValidatingFeignDecoder(Decoder delegate, ExternalPayloadValidator externalPayloadValidator) {
         this.delegate = delegate;
-        this.validator = validator;
+        this.externalPayloadValidator = externalPayloadValidator;
     }
 
     @Override
@@ -37,32 +28,11 @@ public class ValidatingFeignDecoder implements Decoder {
             return null;
         }
 
-        ValidationResult<Object> validationResult = validateDecoded(decoded);
+        ValidationResult<Object> validationResult = externalPayloadValidator.validate(decoded);
         if (validationResult.valid()) {
             return decoded;
         }
 
         throw new FeignResponseValidationException(response, type, validationResult);
-    }
-
-    private ValidationResult<Object> validateDecoded(Object decoded) {
-        List<ViolationDetail> violations = validator.validate(decoded).stream()
-            .map(this::toViolationDetail)
-            .sorted(VIOLATION_ORDER)
-            .toList();
-
-        return violations.isEmpty()
-            ? ValidationResult.success(decoded)
-            : ValidationResult.failure(decoded, violations);
-    }
-
-    private ViolationDetail toViolationDetail(ConstraintViolation<?> violation) {
-        String constraintType = violation.getConstraintDescriptor().getAnnotation().annotationType().getName();
-        return new ViolationDetail(
-            violation.getPropertyPath().toString(),
-            violation.getMessage(),
-            violation.getMessageTemplate(),
-            violation.getInvalidValue(),
-            constraintType);
     }
 }

@@ -1,20 +1,20 @@
 package com.example.validation.feign.internal;
 
+import com.example.validation.core.api.ExternalPayloadValidator;
 import com.example.validation.feign.spi.FeignValidationCapabilityFactory;
 
 import feign.Capability;
-import jakarta.validation.Validator;
 
 public class DefaultFeignValidationCapabilityFactory implements FeignValidationCapabilityFactory {
 
-    private final Validator validator;
+    private final ExternalPayloadValidator externalPayloadValidator;
 
-    public DefaultFeignValidationCapabilityFactory(Validator validator) {
-        this.validator = validator;
+    public DefaultFeignValidationCapabilityFactory(ExternalPayloadValidator externalPayloadValidator) {
+        this.externalPayloadValidator = externalPayloadValidator;
     }
 
     @Override
     public Capability create() {
-        return new ValidatingFeignCapability(validator);
+        return new ValidatingFeignCapability(externalPayloadValidator);
     }
 }
