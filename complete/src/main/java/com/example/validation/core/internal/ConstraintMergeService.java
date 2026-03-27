@@ -1,24 +1,20 @@
 package com.example.validation.core.internal;
 
-import com.example.validation.core.api.FieldConstraintSet;
 import com.example.validation.core.api.JsonPathRegexRule;
-import com.example.validation.core.api.LowerBoundRule;
-import com.example.validation.core.api.NotBlankRule;
-import com.example.validation.core.api.NotNullRule;
 import com.example.validation.core.api.NumericBound;
 import com.example.validation.core.api.PatternRule;
-import com.example.validation.core.api.SizeRule;
-import com.example.validation.core.api.UpperBoundRule;
-import com.example.validation.core.api.ValidationRule;
-import com.example.validation.core.spi.ConstraintContribution;
+import com.example.validation.core.spi.ConstraintOverrideSet;
 import com.jayway.jsonpath.InvalidPathException;
 import com.jayway.jsonpath.JsonPath;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 
@@ -26,68 +22,77 @@ public class ConstraintMergeService {
 
 	public EffectiveFieldConstraints merge(
 		BaselineFieldConstraints baseline,
-		ValidationProperties.Constraints configuredConstraints,
+		ConstraintOverrideSet configuredConstraints,
 		String className,
 		String fieldName
 	) {
-		if (configuredConstraints == null) {
-			return merge(baseline, List.of(), className, fieldName);
-		}
 		return merge(
 			baseline,
-			List.of(PropertiesFieldConstraintContributor.fromConstraints("properties", configuredConstraints, className, fieldName)),
+			(configuredConstraints == null)
+				? List.<RegisteredConstraintOverride>of()
+				: List.of(new RegisteredConstraintOverride("configured", configuredConstraints)),
 			className,
 			fieldName);
 	}
 
 	public EffectiveFieldConstraints merge(
 		BaselineFieldConstraints baseline,
-		Iterable<ConstraintContribution> contributions,
+		ValidationProperties.Constraints configuredConstraints,
 		String className,
 		String fieldName
 	) {
-		boolean notNullEnabled = baseline.notNull();
-		String notNullMessage = null;
-		boolean notBlankEnabled = baseline.notBlank();
-		String notBlankMessage = null;
-		BoundCandidate minCandidate = baselineCandidate(baseline.min());
-		BoundCandidate maxCandidate = baselineCandidate(baseline.max());
-		SizeBoundCandidate sizeMinCandidate = sizeCandidate(baseline.sizeMin());
-		SizeBoundCandidate sizeMaxCandidate = sizeCandidate(baseline.sizeMax());
-		List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
-		List<JsonPathRegexRule> extensionRules = new ArrayList<>(baseline.extensionRules());
+		return merge(baseline, ValidationProperties.toConstraintOverrideSet(configuredConstraints), className, fieldName);
+	}
 
-		for (ConstraintContribution contribution : safeContributions(contributions)) {
-			FieldConstraintSet constraintSet = defaultConstraintSet(contribution);
-			for (ValidationRule rule : constraintSet.rules()) {
-				switch (rule) {
-					case NotNullRule notNullRule -> {
-						notNullEnabled = true;
-						notNullMessage = chooseBooleanMessage(notNullMessage, notNullRule.message());
-					}
-					case NotBlankRule notBlankRule -> {
-						notBlankEnabled = true;
-						notBlankMessage = chooseBooleanMessage(notBlankMessage, notBlankRule.message());
-					}
-					case LowerBoundRule lowerBoundRule -> minCandidate =
-						selectStricterBound(minCandidate, new BoundCandidate(lowerBoundRule.bound(), lowerBoundRule.message()), NumericBound::stricterLower);
-					case UpperBoundRule upperBoundRule -> maxCandidate =
-						selectStricterBound(maxCandidate, new BoundCandidate(upperBoundRule.bound(), upperBoundRule.message()), NumericBound::stricterUpper);
-					case SizeRule sizeRule -> {
-						sizeMinCandidate = selectStricterSizeBound(
-							true,
-							sizeMinCandidate,
-							toSizeCandidate(sizeRule.min(), sizeRule.minMessage(), className, fieldName, "size.min"));
-						sizeMaxCandidate = selectStricterSizeBound(
-							false,
-							sizeMaxCandidate,
-							toSizeCandidate(sizeRule.max(), sizeRule.maxMessage(), className, fieldName, "size.max"));
-					}
-					case PatternRule patternRule -> appendPattern(patterns, patternRule, className, fieldName);
-					case JsonPathRegexRule jsonPathRegexRule -> extensionRules.add(validateExtensionRule(jsonPathRegexRule, className, fieldName));
-				}
-			}
-		}
+	public EffectiveFieldConstraints merge(
+		BaselineFieldConstraints baseline,
+		Iterable<RegisteredConstraintOverride> contributions,
+		String className,
+		String fieldName
+	) {
+		List<ConstraintOverrideSet> configuredConstraints = defaultConstraints(contributions);
+		BooleanConstraintState notNull = resolveBooleanConstraint(
+			baseline.notNull(),
+			configuredConstraints,
+			ConstraintOverrideSet::getNotNull);
+		BooleanConstraintState notBlank = resolveBooleanConstraint(
+			baseline.notBlank(),
+			configuredConstraints,
+			ConstraintOverrideSet::getNotBlank);
+		BoundCandidate minCandidate = resolveBound(
+			baseline.min(),
+			configuredConstraints,
+			ConstraintOverrideSet::getMin,
+			ConstraintOverrideSet::getDecimalMin,
+			className,
+			fieldName,
+			"decimal-min",
+			NumericBound::stricterLower);
+		BoundCandidate maxCandidate = resolveBound(
+			baseline.max(),
+			configuredConstraints,
+			ConstraintOverrideSet::getMax,
+			ConstraintOverrideSet::getDecimalMax,
+			className,
+			fieldName,
+			"decimal-max",
+			NumericBound::stricterUpper);
+		SizeBoundCandidate sizeMinCandidate = resolveSizeBound(
+			baseline.sizeMin(),
+			configuredConstraints,
+			constraint -> constraint.getSize().getMin(),
+			className,
+			fieldName,
+			"size.min.value",
+			true);
+		SizeBoundCandidate sizeMaxCandidate = resolveSizeBound(
+			baseline.sizeMax(),
+			configuredConstraints,
+			constraint -> constraint.getSize().getMax(),
+			className,
+			fieldName,
+			"size.max.value",
+			false);
 
 		NumericBound min = bound(minCandidate);
 		NumericBound max = bound(maxCandidate);
@@ -97,11 +102,24 @@ public class ConstraintMergeService {
 		validateNumericBounds(min, max, className, fieldName);
 		validateSizeBounds(sizeMin, sizeMax, className, fieldName);
 
+		List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
+		List<JsonPathRegexRule> extensionRules = new ArrayList<>(baseline.extensionRules());
+		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
+			appendConfiguredPatterns(
+				patterns,
+				configuredConstraint.getPattern().getRegexes(),
+				configuredConstraint.getPattern().getMessage(),
+				className,
+				fieldName);
+			extensionRules.addAll(
+				toConfiguredExtensionRules(configuredConstraint.getExtensions().getRules(), className, fieldName));
+		}
+
 		return new EffectiveFieldConstraints(
-			notNullEnabled,
-			notNullMessage,
-			notBlankEnabled,
-			notBlankMessage,
+			notNull.enabled(),
+			notNull.message(),
+			notBlank.enabled(),
+			notBlank.message(),
 			min,
 			message(minCandidate),
 			max,
@@ -114,33 +132,121 @@ public class ConstraintMergeService {
 			extensionRules);
 	}
 
-	private List<ConstraintContribution> safeContributions(Iterable<ConstraintContribution> contributions) {
+	private List<ConstraintOverrideSet> defaultConstraints(Iterable<RegisteredConstraintOverride> contributions) {
 		if (contributions == null) {
 			return List.of();
 		}
-		List<ConstraintContribution> safeContributions = new ArrayList<>();
-		for (ConstraintContribution contribution : contributions) {
-			if (contribution != null) {
-				safeContributions.add(contribution);
-			}
+		List<ConstraintOverrideSet> safeContributions = new ArrayList<>();
+		for (RegisteredConstraintOverride contribution : contributions) {
+			safeContributions.add(contribution == null ? new ConstraintOverrideSet() : contribution.constraints());
 		}
 		return safeContributions;
 	}
 
-	private FieldConstraintSet defaultConstraintSet(ConstraintContribution contribution) {
-		return (contribution == null || contribution.constraints() == null)
-			? FieldConstraintSet.empty()
-			: contribution.constraints();
+	private boolean isTrue(Boolean value) {
+		return Boolean.TRUE.equals(value);
 	}
 
-	private String chooseBooleanMessage(String current, String candidate) {
-		return (current == null && candidate != null) ? candidate : current;
+	private BooleanConstraintState resolveBooleanConstraint(
+		boolean baselineEnabled,
+		List<ConstraintOverrideSet> configuredConstraints,
+		Function<ConstraintOverrideSet, ConstraintOverrideSet.ToggleConstraint> selector
+	) {
+		if (baselineEnabled) {
+			return new BooleanConstraintState(true, resolveBaselineBooleanMessage(configuredConstraints, selector));
+		}
+		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
+			ConstraintOverrideSet.ToggleConstraint candidate = selector.apply(configuredConstraint);
+			if (isTrue(candidate.getValue())) {
+				return new BooleanConstraintState(true, candidate.getMessage());
+			}
+		}
+		return new BooleanConstraintState(false, null);
+	}
+
+	private String resolveBaselineBooleanMessage(
+		List<ConstraintOverrideSet> configuredConstraints,
+		Function<ConstraintOverrideSet, ConstraintOverrideSet.ToggleConstraint> selector
+	) {
+		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
+			ConstraintOverrideSet.ToggleConstraint candidate = selector.apply(configuredConstraint);
+			if (candidate.getMessage() != null && candidate.getValue() != Boolean.FALSE) {
+				return candidate.getMessage();
+			}
+		}
+		return null;
+	}
+
+	private BoundCandidate resolveBound(
+		NumericBound baseline,
+		List<ConstraintOverrideSet> configuredConstraints,
+		Function<ConstraintOverrideSet, ConstraintOverrideSet.NumericConstraint> numericAccessor,
+		Function<ConstraintOverrideSet, ConstraintOverrideSet.DecimalConstraint> decimalAccessor,
+		String className,
+		String fieldName,
+		String decimalPropertyPrefix,
+		BinaryOperator<NumericBound> numericSelector
+	) {
+		BoundCandidate result = baselineCandidate(baseline);
+		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
+			ConstraintOverrideSet.NumericConstraint numericConstraint = numericAccessor.apply(configuredConstraint);
+			result = selectStricterBound(
+				result,
+				toInclusiveBound(numericConstraint.getValue(), numericConstraint.getMessage()),
+				numericSelector);
+
+			ConstraintOverrideSet.DecimalConstraint decimalConstraint = decimalAccessor.apply(configuredConstraint);
+			result = selectStricterBound(
+				result,
+				toDecimalBound(
+					decimalConstraint.getValue(),
+					decimalConstraint.getInclusive(),
+					decimalConstraint.getMessage(),
+					className,
+					fieldName,
+					decimalPropertyPrefix + ".value",
+					decimalPropertyPrefix + ".inclusive"),
+				numericSelector);
+		}
+		return result;
+	}
+
+	private SizeBoundCandidate resolveSizeBound(
+		Integer baseline,
+		List<ConstraintOverrideSet> configuredConstraints,
+		Function<ConstraintOverrideSet, ConstraintOverrideSet.NumericConstraint> selector,
+		String className,
+		String fieldName,
+		String valueProperty,
+		boolean selectStricterLower
+	) {
+		SizeBoundCandidate result = sizeCandidate(baseline);
+		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
+			ConstraintOverrideSet.NumericConstraint candidate = selector.apply(configuredConstraint);
+			SizeBoundCandidate candidateBound = toSizeBound(
+				candidate.getValue(),
+				candidate.getMessage(),
+				className,
+				fieldName,
+				valueProperty);
+			if (candidateBound == null || candidateBound.value() == null) {
+				continue;
+			}
+			if (result == null
+				|| result.value() == null
+				|| (selectStricterLower
+					? candidateBound.value().compareTo(result.value()) > 0
+					: candidateBound.value().compareTo(result.value()) < 0)) {
+				result = candidateBound;
+			}
+		}
+		return result;
 	}
 
 	private BoundCandidate selectStricterBound(
 		BoundCandidate current,
 		BoundCandidate candidate,
-		java.util.function.BinaryOperator<NumericBound> selector
+		BinaryOperator<NumericBound> numericSelector
 	) {
 		if (candidate == null || candidate.bound() == null) {
 			return current;
@@ -148,37 +254,128 @@ public class ConstraintMergeService {
 		if (current == null || current.bound() == null) {
 			return candidate;
 		}
-		NumericBound winner = selector.apply(current.bound(), candidate.bound());
+		NumericBound winner = numericSelector.apply(current.bound(), candidate.bound());
 		return (winner == candidate.bound()) ? candidate : current;
 	}
 
-	private SizeBoundCandidate selectStricterSizeBound(boolean lowerBound, SizeBoundCandidate current, SizeBoundCandidate candidate) {
-		if (candidate == null || candidate.value() == null) {
-			return current;
-		}
-		if (current == null || current.value() == null) {
-			return candidate;
-		}
-		int comparison = candidate.value().compareTo(current.value());
-		if ((lowerBound && comparison > 0) || (!lowerBound && comparison < 0)) {
-			return candidate;
-		}
-		return current;
+	private BoundCandidate toInclusiveBound(Long value, String message) {
+		return (value == null) ? null : new BoundCandidate(NumericBound.inclusive(value), message);
 	}
 
-	private void appendPattern(List<PatternRule> patterns, PatternRule patternRule, String className, String fieldName) {
-		PatternRule validatedPattern = validatePatternRule(patternRule, className, fieldName);
-		Map<PatternIdentity, Integer> indexes = indexPatterns(patterns);
-		PatternIdentity identity = new PatternIdentity(validatedPattern.regex());
-		Integer existingIndex = indexes.get(identity);
-		if (existingIndex == null) {
-			patterns.add(validatedPattern);
-			return;
+	private BoundCandidate toDecimalBound(
+		BigDecimal value,
+		Boolean inclusive,
+		String message,
+		String className,
+		String fieldName,
+		String valuePropertyName,
+		String inclusivePropertyName
+	) {
+		if (value == null) {
+			if (inclusive != null) {
+				throw new InvalidConstraintConfigurationException(
+					"Invalid decimal constraint. " + inclusivePropertyName + " requires " + valuePropertyName
+						+ " for class=" + className + ", field=" + fieldName);
+			}
+			return null;
 		}
-		PatternRule existing = patterns.get(existingIndex);
-		if (validatedPattern.message() != null && !Objects.equals(existing.message(), validatedPattern.message())) {
-			patterns.set(existingIndex, new PatternRule(existing.regex(), validatedPattern.message()));
+		return new BoundCandidate(new NumericBound(value, inclusive == null || inclusive), message);
+	}
+
+	private SizeBoundCandidate toSizeBound(
+		Long value,
+		String message,
+		String className,
+		String fieldName,
+		String propertyName
+	) {
+		if (value == null) {
+			return null;
 		}
+		if (value < 0) {
+			throw invalid(propertyName + " must be >= 0", className, fieldName);
+		}
+		try {
+			return new SizeBoundCandidate(Math.toIntExact(value), message);
+		}
+		catch (ArithmeticException exception) {
+			throw new InvalidConstraintConfigurationException(
+				"Invalid size constraint. " + propertyName + " exceeds Integer.MAX_VALUE for class="
+					+ className + ", field=" + fieldName + ", value=" + value,
+				exception);
+		}
+	}
+
+	private void appendConfiguredPatterns(
+		List<PatternRule> patterns,
+		List<String> configuredRegexes,
+		String configuredMessage,
+		String className,
+		String fieldName
+	) {
+		Map<PatternIdentity, Integer> patternIndexes = indexPatterns(patterns);
+		for (int index = 0; index < configuredRegexes.size(); index++) {
+			PatternRule configuredPattern = toConfiguredPatternRule(
+				configuredRegexes.get(index),
+				configuredMessage,
+				className,
+				fieldName,
+				index);
+			PatternIdentity identity = new PatternIdentity(configuredPattern.regex());
+			Integer existingIndex = patternIndexes.get(identity);
+			if (existingIndex == null) {
+				patterns.add(configuredPattern);
+				patternIndexes.put(identity, patterns.size() - 1);
+				continue;
+			}
+			PatternRule existing = patterns.get(existingIndex);
+			if (configuredPattern.message() != null && !Objects.equals(existing.message(), configuredPattern.message())) {
+				patterns.set(existingIndex, new PatternRule(existing.regex(), configuredPattern.message()));
+			}
+		}
+	}
+
+	private PatternRule toConfiguredPatternRule(
+		String configuredRegex,
+		String configuredMessage,
+		String className,
+		String fieldName,
+		int index
+	) {
+		if (configuredRegex == null || configuredRegex.isBlank()) {
+			throw invalid("regex must be non-empty", className, fieldName);
+		}
+		validateRegex("pattern", configuredRegex, className, fieldName);
+		return new PatternRule(configuredRegex.trim(), configuredMessage);
+	}
+
+	private List<JsonPathRegexRule> toConfiguredExtensionRules(
+		List<ConstraintOverrideSet.ExtensionRule> configuredRules,
+		String className,
+		String fieldName
+	) {
+		if (configuredRules == null || configuredRules.isEmpty()) {
+			return List.of();
+		}
+		List<JsonPathRegexRule> converted = new ArrayList<>();
+		for (int index = 0; index < configuredRules.size(); index++) {
+			ConstraintOverrideSet.ExtensionRule configuredRule = configuredRules.get(index);
+			if (configuredRule == null) {
+				throw invalid("extensions.rules[" + index + "] must not be null", className, fieldName);
+			}
+			String jsonPath = configuredRule.getJsonPath();
+			String regex = configuredRule.getRegex();
+			if (jsonPath == null || jsonPath.isBlank()) {
+				throw invalid("extensions.rules[" + index + "].jsonPath must be non-empty", className, fieldName);
+			}
+			if (regex == null || regex.isBlank()) {
+				throw invalid("extensions.rules[" + index + "].regex must be non-empty", className, fieldName);
+			}
+			validateJsonPath(jsonPath, className, fieldName);
+			validateRegex("extensions", regex, className, fieldName);
+			converted.add(new JsonPathRegexRule(jsonPath.trim(), regex.trim(), configuredRule.getMessage()));
+		}
+		return converted;
 	}
 
 	private Map<PatternIdentity, Integer> indexPatterns(List<PatternRule> patterns) {
@@ -187,26 +384,6 @@ public class ConstraintMergeService {
 			indexes.putIfAbsent(new PatternIdentity(patterns.get(index).regex()), index);
 		}
 		return indexes;
-	}
-
-	private PatternRule validatePatternRule(PatternRule patternRule, String className, String fieldName) {
-		if (patternRule == null || patternRule.regex() == null || patternRule.regex().isBlank()) {
-			throw invalid("pattern.regex must be non-empty", className, fieldName);
-		}
-		validateRegex("pattern", patternRule.regex(), className, fieldName);
-		return patternRule;
-	}
-
-	private JsonPathRegexRule validateExtensionRule(JsonPathRegexRule rule, String className, String fieldName) {
-		if (rule == null || rule.jsonPath() == null || rule.jsonPath().isBlank()) {
-			throw invalid("extensions.jsonPath must be non-empty", className, fieldName);
-		}
-		if (rule.regex() == null || rule.regex().isBlank()) {
-			throw invalid("extensions.regex must be non-empty", className, fieldName);
-		}
-		validateJsonPath(rule.jsonPath(), className, fieldName);
-		validateRegex("extensions", rule.regex(), className, fieldName);
-		return rule;
 	}
 
 	private void validateRegex(String constraintName, String regex, String className, String fieldName) {
@@ -231,16 +408,6 @@ public class ConstraintMergeService {
 					+ className + ", field=" + fieldName + ", jsonPath=" + jsonPath,
 				exception);
 		}
-	}
-
-	private SizeBoundCandidate toSizeCandidate(Integer value, String message, String className, String fieldName, String propertyName) {
-		if (value == null) {
-			return null;
-		}
-		if (value < 0) {
-			throw invalid(propertyName + " must be >= 0", className, fieldName);
-		}
-		return new SizeBoundCandidate(value, message);
 	}
 
 	private void validateNumericBounds(NumericBound min, NumericBound max, String className, String fieldName) {
@@ -299,6 +466,9 @@ public class ConstraintMergeService {
 	private InvalidConstraintConfigurationException invalid(String message, String className, String fieldName) {
 		return new InvalidConstraintConfigurationException(
 			"Invalid configured constraints for class=" + className + ", field=" + fieldName + ". " + message);
+	}
+
+	private record BooleanConstraintState(boolean enabled, String message) {
 	}
 
 	private record BoundCandidate(NumericBound bound, String message) {

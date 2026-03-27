@@ -1,6 +1,7 @@
 package com.example.validation.core.internal;
 
 import com.example.validation.core.api.*;
+import com.example.validation.core.spi.ConstraintOverrideSet;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -135,6 +136,30 @@ class ConstraintMergeServiceTests {
 		assertThat(effective.notNullMessage()).isEqualTo("Name is required");
 		assertThat(effective.notBlank()).isTrue();
 		assertThat(effective.notBlankMessage()).isEqualTo("Name must have text");
+	}
+
+	@Test
+	void shouldMergeMultipleRegisteredOverridesForSameField() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ConstraintOverrideSet first = new ConstraintOverrideSet();
+		first.getNotBlank().setValue(true);
+		first.getNotBlank().setMessage("Name must have text");
+		ConstraintOverrideSet second = new ConstraintOverrideSet();
+		second.getSize().getMin().setValue(3L);
+		second.getSize().getMin().setMessage("Too short");
+
+		EffectiveFieldConstraints effective = mergeService.merge(
+			baseline,
+			List.of(
+				new RegisteredConstraintOverride("properties", first),
+				new RegisteredConstraintOverride("custom", second)),
+			"AnyClass",
+			"name");
+
+		assertThat(effective.notBlank()).isTrue();
+		assertThat(effective.notBlankMessage()).isEqualTo("Name must have text");
+		assertThat(effective.sizeMin()).isEqualTo(3);
+		assertThat(effective.sizeMinMessage()).isEqualTo("Too short");
 	}
 
 	@Test

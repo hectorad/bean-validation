@@ -1,6 +1,10 @@
 package com.example.validation.core.internal;
 
 import com.example.validation.core.api.*;
+import com.example.validation.core.spi.ClassValidationOverride;
+import com.example.validation.core.spi.ConstraintOverrideSet;
+import com.example.validation.core.spi.FieldValidationOverride;
+import com.example.validation.core.spi.ValidationOverrideContributor;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -13,6 +17,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
 
@@ -34,6 +39,9 @@ public class GeneratedClassMetadataCacheTests {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName("com.example.missing.MissingPerson");
+		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
+		fieldMapping.setFieldName("name");
+		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
 		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
@@ -376,29 +384,14 @@ public class GeneratedClassMetadataCacheTests {
 	}
 
 	@Test
-	void shouldSkipDuplicateClassMappingWhenFailOnErrorIsFalse() {
-		ValidationProperties properties = new ValidationProperties();
-		ValidationProperties.ClassMapping classMapping1 = new ValidationProperties.ClassMapping();
-		classMapping1.setFullClassName(PersonForm.class.getName());
-		ValidationProperties.FieldMapping fieldMapping1 = new ValidationProperties.FieldMapping();
-		fieldMapping1.setFieldName("name");
-		classMapping1.setFields(List.of(fieldMapping1));
+	void shouldAllowTargetsIntroducedByCustomContributor() {
+		GeneratedClassMetadataCache cache = cache(List.of(
+			contributor(classOverride(
+				CustomContributorTarget.class,
+				fieldOverride("name", constraints -> constraints.getSize().getMin().setValue(5L))))));
 
-		ValidationProperties.ClassMapping classMapping2 = new ValidationProperties.ClassMapping();
-		classMapping2.setFullClassName(PersonForm.class.getName());
-		ValidationProperties.FieldMapping fieldMapping2 = new ValidationProperties.FieldMapping();
-		fieldMapping2.setFieldName("age");
-		classMapping2.setFields(List.of(fieldMapping2));
-
-		properties.setBusinessValidationOverride(List.of(classMapping1, classMapping2));
-
-		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
-
-		assertThat(cache.getResolvedMappings()).hasSize(1);
-		assertThat(cache.getResolvedMappings().get(0).fields())
-			.singleElement()
-			.extracting(ResolvedFieldMapping::fieldName)
-			.isEqualTo("name");
+		assertThat(cache.getResolvedMappings()).singleElement().satisfies(mapping ->
+			assertThat(mapping.className()).isEqualTo(CustomContributorTarget.class.getName()));
 	}
 
 	private ResolvedFieldMapping resolveSingleField(Class<?> targetType, String fieldName) {
@@ -413,6 +406,24 @@ public class GeneratedClassMetadataCacheTests {
 		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
 
 		return cache.getRequiredResolvedMapping(targetType.getName()).fields().get(0);
+	}
+
+	private GeneratedClassMetadataCache cache(List<ValidationOverrideContributor> contributors) {
+		return new GeneratedClassMetadataCache(new ValidationOverrideRegistry(contributors));
+	}
+
+	private ValidationOverrideContributor contributor(ClassValidationOverride... overrides) {
+		return () -> List.of(overrides);
+	}
+
+	private ClassValidationOverride classOverride(Class<?> type, FieldValidationOverride... fields) {
+		return new ClassValidationOverride(type.getName(), List.of(fields));
+	}
+
+	private FieldValidationOverride fieldOverride(String fieldName, Consumer<ConstraintOverrideSet> customizer) {
+		ConstraintOverrideSet constraints = new ConstraintOverrideSet();
+		customizer.accept(constraints);
+		return new FieldValidationOverride(fieldName, constraints);
 	}
 
 	private static final class UnsupportedConstraintTarget {
@@ -437,6 +448,12 @@ public class GeneratedClassMetadataCacheTests {
 
 		@SuppressWarnings("unused")
 		private Double ratio;
+	}
+
+	private static final class CustomContributorTarget {
+
+		@SuppressWarnings("unused")
+		private String name;
 	}
 
 	private static final class MalformedDecimalAnnotationTarget {

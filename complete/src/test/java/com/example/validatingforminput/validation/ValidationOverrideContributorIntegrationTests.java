@@ -4,13 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.example.validatingforminput.ValidatingFormInputApplication;
 import com.example.validation.core.api.ExternalPayloadValidator;
-import com.example.validation.core.api.FieldConstraintSet;
-import com.example.validation.core.api.NotBlankRule;
 import com.example.validation.core.api.ValidationResult;
 import com.example.validation.core.api.ViolationDetail;
-import com.example.validation.core.spi.ConstraintContribution;
-import com.example.validation.core.spi.FieldConstraintContributor;
-import com.example.validation.core.spi.ValidationFieldContext;
+import com.example.validation.core.spi.ClassValidationOverride;
+import com.example.validation.core.spi.ConstraintOverrideSet;
+import com.example.validation.core.spi.FieldValidationOverride;
+import com.example.validation.core.spi.ValidationOverrideContributor;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,15 +21,12 @@ import org.springframework.test.context.junit.jupiter.SpringExtension;
 
 import jakarta.validation.constraints.Size;
 
+import java.util.List;
+
 @ExtendWith(SpringExtension.class)
-@SpringBootTest(
-	classes = ValidatingFormInputApplication.class,
-	properties = {
-		"com.ampp.business-validation-override[0].full-class-name=com.example.validation.core.internal.FieldConstraintContributorIntegrationTests$ContributorTarget",
-		"com.ampp.business-validation-override[0].fields[0].field-name=name"
-	})
-@Import(FieldConstraintContributorIntegrationTests.FieldConstraintContributorTestConfiguration.class)
-class FieldConstraintContributorIntegrationTests {
+@SpringBootTest(classes = ValidatingFormInputApplication.class)
+@Import(ValidationOverrideContributorIntegrationTests.ValidationOverrideContributorTestConfiguration.class)
+class ValidationOverrideContributorIntegrationTests {
 
 	@Autowired
 	private ExternalPayloadValidator externalPayloadValidator;
@@ -47,20 +43,26 @@ class FieldConstraintContributorIntegrationTests {
 	}
 
 	@TestConfiguration
-	static class FieldConstraintContributorTestConfiguration {
+	static class ValidationOverrideContributorTestConfiguration {
 
 		@Bean
-		FieldConstraintContributor blankNameContributor() {
-			return fieldContext -> contributesNotBlank(fieldContext)
-				? java.util.Optional.of(new ConstraintContribution(
-					"test-contributor",
-					new FieldConstraintSet(java.util.List.of(new NotBlankRule("Name must not be blank")))))
-				: java.util.Optional.empty();
-		}
+		ValidationOverrideContributor blankNameContributor() {
+			return new ValidationOverrideContributor() {
+				@Override
+				public List<ClassValidationOverride> getValidationOverrides() {
+					ConstraintOverrideSet constraints = new ConstraintOverrideSet();
+					constraints.getNotBlank().setValue(true);
+					constraints.getNotBlank().setMessage("Name must not be blank");
+					return List.of(new ClassValidationOverride(
+						ContributorTarget.class.getName(),
+						List.of(new FieldValidationOverride("name", constraints))));
+				}
 
-		private boolean contributesNotBlank(ValidationFieldContext fieldContext) {
-			return ContributorTarget.class.getName().equals(fieldContext.declaringClassName())
-				&& "name".equals(fieldContext.fieldName());
+				@Override
+				public String sourceId() {
+					return "test-contributor";
+				}
+			};
 		}
 	}
 

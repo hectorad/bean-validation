@@ -37,8 +37,10 @@ class ValidationAutoConfigurationDiscoveryTests {
 				.isNotNull();
 			assertThat(userBeanNamesForType(context, ConfigDrivenConstraintMappingContributor.class)).hasSize(1);
 			assertThat(userBeanNamesForType(context, ConstraintMergeService.class)).hasSize(1);
+			assertThat(userBeanNamesForType(context, ValidationOverrideRegistry.class)).hasSize(1);
 			assertThat(userBeanNamesForType(context, GeneratedClassMetadataCache.class)).hasSize(1);
 			assertThat(context.getBeansOfType(ExternalPayloadValidator.class)).hasSize(1);
+			assertThat(userBeanNamesForType(context, com.example.validation.core.spi.ValidationOverrideContributor.class)).hasSize(1);
 			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.containsBean("personValidationService")).isFalse();
@@ -56,7 +58,9 @@ class ValidationAutoConfigurationDiscoveryTests {
 			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
+			assertThat(context.getBeansOfType(ValidationOverrideRegistry.class)).isEmpty();
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
+			assertThat(context.getBeansOfType(com.example.validation.core.spi.ValidationOverrideContributor.class)).isEmpty();
 			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNotNull();
 			assertThat(validator.usingContext()).isNotNull();
 			assertThat(validator.unwrap(jakarta.validation.ValidatorFactory.class)).isNotNull();

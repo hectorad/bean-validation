@@ -3,9 +3,6 @@ package com.example.validation.core.internal;
 import com.example.validation.core.api.ExtensionsJsonPathRegex;
 import com.example.validation.core.api.JsonPathRegexRule;
 import com.example.validation.core.api.PatternRule;
-import com.example.validation.core.spi.ConstraintContribution;
-import com.example.validation.core.spi.FieldConstraintContributor;
-import com.example.validation.core.spi.ValidationFieldContext;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
@@ -36,31 +33,31 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	private static final Logger log = LoggerFactory.getLogger(ConfigDrivenConstraintMappingContributor.class);
 
+	private final ValidationOverrideRegistry validationOverrideRegistry;
+
 	private final ConstraintMergeService constraintMergeService;
 
 	private final java.util.List<ResolvedClassMapping> resolvedClassMappings;
 
-	private final java.util.List<FieldConstraintContributor> fieldConstraintContributors;
-
 	private final boolean failOnError;
 
 	public ConfigDrivenConstraintMappingContributor(
+		ValidationOverrideRegistry validationOverrideRegistry,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
-		ConstraintMergeService constraintMergeService,
-		List<FieldConstraintContributor> fieldConstraintContributors
+		ConstraintMergeService constraintMergeService
 	) {
-		this(generatedClassMetadataCache, constraintMergeService, fieldConstraintContributors, true);
+		this(validationOverrideRegistry, generatedClassMetadataCache, constraintMergeService, true);
 	}
 
 	public ConfigDrivenConstraintMappingContributor(
+		ValidationOverrideRegistry validationOverrideRegistry,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
 		ConstraintMergeService constraintMergeService,
-		List<FieldConstraintContributor> fieldConstraintContributors,
 		boolean failOnError
 	) {
+		this.validationOverrideRegistry = validationOverrideRegistry;
 		this.constraintMergeService = constraintMergeService;
 		this.resolvedClassMappings = generatedClassMetadataCache.getResolvedMappings();
-		this.fieldConstraintContributors = List.copyOf(fieldConstraintContributors);
 		this.failOnError = failOnError;
 	}
 
@@ -74,7 +71,9 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				try {
 					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
 						resolvedFieldMapping.baselineConstraints(),
-						contributionsFor(resolvedClassMapping, resolvedFieldMapping),
+						validationOverrideRegistry.contributionsFor(
+							resolvedClassMapping.className(),
+							resolvedFieldMapping.fieldName()),
 						resolvedClassMapping.className(),
 						resolvedFieldMapping.fieldName());
 
@@ -89,21 +88,6 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				}
 			}
 		}
-	}
-
-	private List<ConstraintContribution> contributionsFor(
-		ResolvedClassMapping resolvedClassMapping,
-		ResolvedFieldMapping resolvedFieldMapping
-	) {
-		ValidationFieldContext fieldContext = new ValidationFieldContext(
-			resolvedClassMapping.className(),
-			resolvedFieldMapping.fieldName(),
-			resolvedFieldMapping.fieldType(),
-			resolvedFieldMapping.baselineConstraints().toConstraintSet());
-		return fieldConstraintContributors.stream()
-			.map(contributor -> contributor.contribute(fieldContext))
-			.flatMap(java.util.Optional::stream)
-			.toList();
 	}
 
 	private void applyConstraints(

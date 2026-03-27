@@ -1,5 +1,9 @@
 package com.example.validation.core.internal;
 
+import com.example.validation.core.spi.ClassValidationOverride;
+import com.example.validation.core.spi.ConstraintOverrideSet;
+import com.example.validation.core.spi.FieldValidationOverride;
+
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotEmpty;
@@ -88,6 +92,75 @@ public class ValidationProperties {
 
     public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
         this.businessValidationOverride = copyList(businessValidationOverride);
+    }
+
+    public List<ClassValidationOverride> toValidationOverrides() {
+        List<ClassValidationOverride> overrides = new ArrayList<>();
+        for (ClassMapping classMapping : businessValidationOverride) {
+            if (classMapping == null) {
+                continue;
+            }
+            List<FieldValidationOverride> fieldOverrides = new ArrayList<>();
+            for (FieldMapping fieldMapping : classMapping.getFields()) {
+                if (fieldMapping == null) {
+                    continue;
+                }
+                fieldOverrides.add(new FieldValidationOverride(
+                    fieldMapping.getFieldName(),
+                    toConstraintOverrideSet(fieldMapping.getConstraints())));
+            }
+            overrides.add(new ClassValidationOverride(classMapping.getFullClassName(), fieldOverrides));
+        }
+        return List.copyOf(overrides);
+    }
+
+    static ConstraintOverrideSet toConstraintOverrideSet(Constraints constraints) {
+        Constraints source = defaultValue(constraints, Constraints::new);
+        ConstraintOverrideSet target = new ConstraintOverrideSet();
+
+        target.getNotNull().setValue(source.getNotNull().getValue());
+        target.getNotNull().setMessage(source.getNotNull().getMessage());
+
+        target.getNotBlank().setValue(source.getNotBlank().getValue());
+        target.getNotBlank().setMessage(source.getNotBlank().getMessage());
+
+        target.getMin().setValue(source.getMin().getValue());
+        target.getMin().setMessage(source.getMin().getMessage());
+
+        target.getMax().setValue(source.getMax().getValue());
+        target.getMax().setMessage(source.getMax().getMessage());
+
+        target.getDecimalMin().setValue(source.getDecimalMin().getValue());
+        target.getDecimalMin().setInclusive(source.getDecimalMin().getInclusive());
+        target.getDecimalMin().setMessage(source.getDecimalMin().getMessage());
+
+        target.getDecimalMax().setValue(source.getDecimalMax().getValue());
+        target.getDecimalMax().setInclusive(source.getDecimalMax().getInclusive());
+        target.getDecimalMax().setMessage(source.getDecimalMax().getMessage());
+
+        target.getSize().getMin().setValue(source.getSize().getMin().getValue());
+        target.getSize().getMin().setMessage(source.getSize().getMin().getMessage());
+        target.getSize().getMax().setValue(source.getSize().getMax().getValue());
+        target.getSize().getMax().setMessage(source.getSize().getMax().getMessage());
+
+        target.getPattern().setRegexes(source.getPattern().getRegexes());
+        target.getPattern().setMessage(source.getPattern().getMessage());
+
+        List<ConstraintOverrideSet.ExtensionRule> extensionRules = new ArrayList<>();
+        for (ExtensionRuleConstraint rule : source.getExtensions().getRules()) {
+            if (rule == null) {
+                extensionRules.add(null);
+                continue;
+            }
+            ConstraintOverrideSet.ExtensionRule extensionRule = new ConstraintOverrideSet.ExtensionRule();
+            extensionRule.setJsonPath(rule.getJsonPath());
+            extensionRule.setRegex(rule.getRegex());
+            extensionRule.setMessage(rule.getMessage());
+            extensionRules.add(extensionRule);
+        }
+        target.getExtensions().setRules(extensionRules);
+
+        return target;
     }
 
     public static class RequestValidationBypass {

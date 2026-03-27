@@ -30,7 +30,6 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.core.annotation.AnnotationUtils;
 import org.springframework.util.ClassUtils;
 import org.springframework.util.ReflectionUtils;
-import org.springframework.util.StringUtils;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Valid;
@@ -70,8 +69,16 @@ public class GeneratedClassMetadataCache {
 	}
 
 	public GeneratedClassMetadataCache(ValidationProperties validationProperties, boolean failOnError) {
+		this(new ValidationOverrideRegistry(List.of(new PropertiesValidationOverrideContributor(validationProperties))), failOnError);
+	}
+
+	public GeneratedClassMetadataCache(ValidationOverrideRegistry validationOverrideRegistry) {
+		this(validationOverrideRegistry, true);
+	}
+
+	public GeneratedClassMetadataCache(ValidationOverrideRegistry validationOverrideRegistry, boolean failOnError) {
 		this.failOnError = failOnError;
-		this.resolvedClassMappingsByName = buildResolvedMappings(validationProperties);
+		this.resolvedClassMappingsByName = buildResolvedMappings(validationOverrideRegistry);
 		this.resolvedClassMappings = List.copyOf(this.resolvedClassMappingsByName.values());
 	}
 
@@ -87,26 +94,28 @@ public class GeneratedClassMetadataCache {
 		return resolvedClassMapping;
 	}
 
-	private Map<String, ResolvedClassMapping> buildResolvedMappings(ValidationProperties validationProperties) {
+	private Map<String, ResolvedClassMapping> buildResolvedMappings(ValidationOverrideRegistry validationOverrideRegistry) {
 		Map<String, ResolvedClassMapping> mappingIndex = new LinkedHashMap<>();
 
-		for (ValidationProperties.ClassMapping classMapping : validationProperties.getBusinessValidationOverride()) {
+		for (String className : validationOverrideRegistry.classNames()) {
 			try {
-				String className = normalizeClassName(classMapping);
 				if (mappingIndex.containsKey(className)) {
 					throw new IllegalStateException("Duplicate class mapping found in validation configuration: " + className);
 				}
 
 				Class<?> clazz = resolveClass(className);
 				Map<String, ResolvedFieldMapping> fieldMappingIndex = new LinkedHashMap<>();
-				for (ValidationProperties.FieldMapping fieldMapping : classMapping.getFields()) {
+				for (String fieldName : validationOverrideRegistry.fieldNames(className)) {
 					try {
-						String fieldName = normalizeFieldName(className, fieldMapping);
 						if (fieldMappingIndex.containsKey(fieldName)) {
 							throw new IllegalStateException("Duplicate field mapping found for class " + className + ": " + fieldName);
 						}
 
-						ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(clazz, className, fieldMapping);
+						ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(
+							clazz,
+							className,
+							fieldName,
+							validationOverrideRegistry.contributionsFor(className, fieldName));
 						fieldMappingIndex.put(fieldName, resolvedFieldMapping);
 					}
 					catch (RuntimeException exception) {
@@ -135,30 +144,15 @@ public class GeneratedClassMetadataCache {
 	private ResolvedFieldMapping resolveFieldMapping(
 		Class<?> clazz,
 		String className,
-		ValidationProperties.FieldMapping fieldMapping
+		String fieldName,
+		List<RegisteredConstraintOverride> constraints
 	) {
-		String fieldName = fieldMapping.getFieldName();
 		Field field = resolveField(clazz, className, fieldName);
 		Optional<Method> getter = findGetter(clazz, fieldName);
 		BaselineFieldConstraints baseline = extractBaseline(field, getter, className);
 		FieldValidationMetadata validationMetadata = extractValidationMetadata(field, getter);
-		validateConstraints(className, field, baseline, fieldMapping.getConstraints());
+		validateConstraints(className, field, baseline, constraints);
 		return new ResolvedFieldMapping(fieldName, field.getType(), baseline, validationMetadata);
-	}
-
-	private String normalizeClassName(ValidationProperties.ClassMapping classMapping) {
-		if (classMapping == null || !StringUtils.hasText(classMapping.getFullClassName())) {
-			throw new IllegalStateException("Each validation class mapping must define a non-empty fullClassName.");
-		}
-		return classMapping.getFullClassName().trim();
-	}
-
-	private String normalizeFieldName(String className, ValidationProperties.FieldMapping fieldMapping) {
-		if (fieldMapping == null || !StringUtils.hasText(fieldMapping.getFieldName())) {
-			throw new IllegalStateException(
-				"Each field mapping must define a non-empty fieldName for class: " + className);
-		}
-		return fieldMapping.getFieldName().trim();
 	}
 
 	private Class<?> resolveClass(String className) {
@@ -308,27 +302,25 @@ public class GeneratedClassMetadataCache {
 		String className,
 		Field field,
 		BaselineFieldConstraints baseline,
-		ValidationProperties.Constraints constraints
+		List<RegisteredConstraintOverride> constraints
 	) {
-		if (constraints == null) {
-			constraints = new ValidationProperties.Constraints();
-		}
+		List<RegisteredConstraintOverride> effectiveConstraints = (constraints == null) ? List.of() : constraints;
 
 		Class<?> rawFieldType = field.getType();
 		Class<?> fieldType = ClassUtils.resolvePrimitiveIfNecessary(rawFieldType);
 		String fieldName = field.getName();
-		boolean extensionsConfigured = hasConfiguredExtensions(constraints);
+		boolean extensionsConfigured = hasConfiguredExtensions(effectiveConstraints);
 
-		if (isNotBlankEnabled(constraints) && !supportsCharSequence(fieldType)) {
+		if (isNotBlankEnabled(effectiveConstraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("notBlank", className, fieldName, fieldType);
 		}
-		if ((hasNumericBounds(baseline) || hasNumericBounds(constraints)) && !supportsNumericBounds(fieldType)) {
+		if ((hasNumericBounds(baseline) || hasNumericBounds(effectiveConstraints)) && !supportsNumericBounds(fieldType)) {
 			throw unsupportedConstraint("numeric bounds", className, fieldName, fieldType);
 		}
-		if (hasSizeBounds(constraints) && !supportsContainerValue(rawFieldType)) {
+		if (hasSizeBounds(effectiveConstraints) && !supportsContainerValue(rawFieldType)) {
 			throw unsupportedConstraint("size", className, fieldName, rawFieldType);
 		}
-		if (hasConfiguredPatterns(constraints) && !supportsCharSequence(fieldType)) {
+		if (hasConfiguredPatterns(effectiveConstraints) && !supportsCharSequence(fieldType)) {
 			throw unsupportedConstraint("pattern", className, fieldName, fieldType);
 		}
 		if (extensionsConfigured && !supportsContainerValue(rawFieldType)) {
@@ -419,32 +411,42 @@ public class GeneratedClassMetadataCache {
 		return (first == null) ? second : Math.min(first, second);
 	}
 
-	private boolean isNotBlankEnabled(ValidationProperties.Constraints constraints) {
-		return Boolean.TRUE.equals(constraints.getNotBlank().getValue());
+	private boolean isNotBlankEnabled(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::constraints)
+			.anyMatch(constraint -> Boolean.TRUE.equals(constraint.getNotBlank().getValue()));
 	}
 
 	private boolean hasNumericBounds(BaselineFieldConstraints baseline) {
 		return baseline.min() != null || baseline.max() != null;
 	}
 
-	private boolean hasNumericBounds(ValidationProperties.Constraints constraints) {
-		return constraints.getMin().getValue() != null
-			|| constraints.getMax().getValue() != null
-			|| constraints.getDecimalMin().getValue() != null
-			|| constraints.getDecimalMax().getValue() != null;
+	private boolean hasNumericBounds(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::constraints)
+			.anyMatch(constraint -> constraint.getMin().getValue() != null
+				|| constraint.getMax().getValue() != null
+				|| constraint.getDecimalMin().getValue() != null
+				|| constraint.getDecimalMax().getValue() != null);
 	}
 
-	private boolean hasSizeBounds(ValidationProperties.Constraints constraints) {
-		return constraints.getSize().getMin().getValue() != null
-			|| constraints.getSize().getMax().getValue() != null;
+	private boolean hasSizeBounds(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::constraints)
+			.anyMatch(constraint -> constraint.getSize().getMin().getValue() != null
+				|| constraint.getSize().getMax().getValue() != null);
 	}
 
-	private boolean hasConfiguredPatterns(ValidationProperties.Constraints constraints) {
-		return !constraints.getPattern().getRegexes().isEmpty();
+	private boolean hasConfiguredPatterns(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::constraints)
+			.anyMatch(constraint -> !constraint.getPattern().getRegexes().isEmpty());
 	}
 
-	private boolean hasConfiguredExtensions(ValidationProperties.Constraints constraints) {
-		return !constraints.getExtensions().getRules().isEmpty();
+	private boolean hasConfiguredExtensions(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::constraints)
+			.anyMatch(constraint -> !constraint.getExtensions().getRules().isEmpty());
 	}
 
 	private boolean supportsCharSequence(Class<?> fieldType) {
