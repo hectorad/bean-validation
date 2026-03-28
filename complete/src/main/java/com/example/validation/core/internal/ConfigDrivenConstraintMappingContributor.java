@@ -39,26 +39,14 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	private final java.util.List<ResolvedClassMapping> resolvedClassMappings;
 
-	private final boolean failOnError;
-
 	public ConfigDrivenConstraintMappingContributor(
 		ValidationOverrideRegistry validationOverrideRegistry,
 		GeneratedClassMetadataCache generatedClassMetadataCache,
 		ConstraintMergeService constraintMergeService
 	) {
-		this(validationOverrideRegistry, generatedClassMetadataCache, constraintMergeService, true);
-	}
-
-	public ConfigDrivenConstraintMappingContributor(
-		ValidationOverrideRegistry validationOverrideRegistry,
-		GeneratedClassMetadataCache generatedClassMetadataCache,
-		ConstraintMergeService constraintMergeService,
-		boolean failOnError
-	) {
 		this.validationOverrideRegistry = validationOverrideRegistry;
 		this.constraintMergeService = constraintMergeService;
 		this.resolvedClassMappings = generatedClassMetadataCache.getResolvedMappings();
-		this.failOnError = failOnError;
 	}
 
 	@Override
@@ -68,26 +56,36 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
 
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
+				List<RegisteredConstraintOverride> contributions = validationOverrideRegistry.contributionsFor(
+					resolvedClassMapping.className(),
+					resolvedFieldMapping.fieldName());
 				try {
 					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
 						resolvedFieldMapping.baselineConstraints(),
-						validationOverrideRegistry.contributionsFor(
-							resolvedClassMapping.className(),
-							resolvedFieldMapping.fieldName()),
+						contributions,
 						resolvedClassMapping.className(),
 						resolvedFieldMapping.fieldName());
 
 					applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
 				}
 				catch (RuntimeException exception) {
-					if (failOnError) {
-						throw exception;
-					}
-					log.warn("Skipping constraint mapping for class={}, field={} due to error: {}",
-						resolvedClassMapping.className(), resolvedFieldMapping.fieldName(), exception.getMessage());
+					log.warn(
+						"Skipping validation override constraint mapping for class={}, field={}, sources={} due to error: {}",
+						resolvedClassMapping.className(),
+						resolvedFieldMapping.fieldName(),
+						renderSources(contributions),
+						exception.getMessage());
 				}
 			}
 		}
+	}
+
+	private String renderSources(List<RegisteredConstraintOverride> contributions) {
+		return contributions.stream()
+			.map(RegisteredConstraintOverride::sourceId)
+			.distinct()
+			.toList()
+			.toString();
 	}
 
 	private void applyConstraints(

@@ -7,7 +7,6 @@ import com.example.validation.core.spi.FieldValidationOverride;
 import com.example.validation.core.spi.ValidationOverrideContributor;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -20,6 +19,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import com.example.validatingforminput.PersonForm;
 
@@ -32,10 +34,11 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+@ExtendWith(OutputCaptureExtension.class)
 public class GeneratedClassMetadataCacheTests {
 
 	@Test
-	void shouldFailWhenClassDoesNotExist() {
+	void shouldWarnAndSkipWhenClassDoesNotExist(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName("com.example.missing.MissingPerson");
@@ -44,13 +47,18 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Configured class was not found");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut())
+			.contains("Skipping validation override class mapping")
+			.contains("class=com.example.missing.MissingPerson")
+			.contains("sources=[properties]")
+			.contains("Configured class was not found");
 	}
 
 	@Test
-	void shouldFailWhenConfiguredFieldDoesNotExist() {
+	void shouldWarnAndSkipWhenConfiguredFieldDoesNotExist(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -59,13 +67,19 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Configured field was not found");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut())
+			.contains("Skipping validation override field mapping")
+			.contains("class=" + PersonForm.class.getName())
+			.contains("field=doesNotExist")
+			.contains("sources=[properties]")
+			.contains("Configured field was not found");
 	}
 
 	@Test
-	void shouldFailWhenNotBlankIsConfiguredForNonStringField() {
+	void shouldWarnAndSkipWhenNotBlankIsConfiguredForNonStringField(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -77,13 +91,14 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint notBlank is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint notBlank is not supported");
 	}
 
 	@Test
-	void shouldFailWhenSizeIsConfiguredForUnsupportedFieldType() {
+	void shouldWarnAndSkipWhenSizeIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -95,13 +110,14 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint size is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint size is not supported");
 	}
 
 	@Test
-	void shouldFailWhenPatternIsConfiguredForNonStringField() {
+	void shouldWarnAndSkipWhenPatternIsConfiguredForNonStringField(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -113,13 +129,14 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint pattern is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint pattern is not supported");
 	}
 
 	@Test
-	void shouldFailWhenExtensionsRuleIsConfiguredForUnsupportedFieldType() {
+	void shouldWarnAndSkipWhenExtensionsRuleIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedExtensionsFieldTypeTarget.class.getName());
@@ -134,9 +151,10 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint extensions is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint extensions is not supported");
 	}
 
 	@Test
@@ -164,7 +182,7 @@ public class GeneratedClassMetadataCacheTests {
 	}
 
 	@Test
-	void shouldFailWhenMinIsConfiguredForUnsupportedFieldType() {
+	void shouldWarnAndSkipWhenMinIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedConstraintTarget.class.getName());
@@ -176,9 +194,10 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint numeric bounds is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint numeric bounds is not supported");
 	}
 
 	@Test
@@ -249,7 +268,7 @@ public class GeneratedClassMetadataCacheTests {
 	}
 
 	@Test
-	void shouldFailWhenDecimalBoundsAreConfiguredForUnsupportedFieldType() {
+	void shouldWarnAndSkipWhenDecimalBoundsAreConfiguredForUnsupportedFieldType(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedDecimalConstraintTarget.class.getName());
@@ -261,13 +280,14 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Constraint numeric bounds is not supported");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Constraint numeric bounds is not supported");
 	}
 
 	@Test
-	void shouldFailWhenDecimalAnnotationValueIsMalformed() {
+	void shouldWarnAndSkipWhenDecimalAnnotationValueIsMalformed(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(MalformedDecimalAnnotationTarget.class.getName());
@@ -276,13 +296,14 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(InvalidConstraintConfigurationException.class)
-			.hasMessageContaining("Invalid DecimalMin annotation");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertThat(cache.getResolvedMappings()).isEmpty();
+		assertThat(output.getOut()).contains("Invalid DecimalMin annotation");
 	}
 
 	@Test
-	void shouldFailWhenDuplicateClassMappingExists() {
+	void shouldWarnAndKeepFirstClassMappingWhenDuplicateClassMappingExists(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping1 = new ValidationProperties.ClassMapping();
 		classMapping1.setFullClassName(PersonForm.class.getName());
@@ -298,13 +319,17 @@ public class GeneratedClassMetadataCacheTests {
 
 		properties.setBusinessValidationOverride(List.of(classMapping1, classMapping2));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Duplicate class mapping");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertSingleResolvedField(cache, "name");
+		assertThat(output.getOut())
+			.contains("Skipping duplicate validation override class mapping")
+			.contains("source=properties")
+			.contains("class=" + PersonForm.class.getName());
 	}
 
 	@Test
-	void shouldFailWhenDuplicateFieldMappingExists() {
+	void shouldWarnAndKeepFirstFieldMappingWhenDuplicateFieldMappingExists(CapturedOutput output) {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -317,13 +342,18 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping1, fieldMapping2));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		assertThatThrownBy(() -> new GeneratedClassMetadataCache(properties))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Duplicate field mapping");
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
+
+		assertSingleResolvedField(cache, "name");
+		assertThat(output.getOut())
+			.contains("Skipping duplicate validation override field mapping")
+			.contains("source=properties")
+			.contains("class=" + PersonForm.class.getName())
+			.contains("field=name");
 	}
 
 	@Test
-	void shouldSkipUnknownClassWhenFailOnErrorIsFalse() {
+	void shouldSkipUnknownClassByDefault() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName("com.example.missing.MissingPerson");
@@ -332,13 +362,13 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
 
 		assertThat(cache.getResolvedMappings()).isEmpty();
 	}
 
 	@Test
-	void shouldSkipUnknownFieldWhenFailOnErrorIsFalse() {
+	void shouldSkipUnknownFieldAndKeepValidFieldByDefault() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -349,17 +379,13 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(validField, invalidField));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
 
-		assertThat(cache.getResolvedMappings()).hasSize(1);
-		assertThat(cache.getResolvedMappings().get(0).fields())
-			.singleElement()
-			.extracting(ResolvedFieldMapping::fieldName)
-			.isEqualTo("name");
+		assertSingleResolvedField(cache, "name");
 	}
 
 	@Test
-	void shouldSkipIncompatibleConstraintWhenFailOnErrorIsFalse() {
+	void shouldSkipIncompatibleConstraintAndKeepValidFieldByDefault() {
 		ValidationProperties properties = new ValidationProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
@@ -374,13 +400,9 @@ public class GeneratedClassMetadataCacheTests {
 		classMapping.setFields(List.of(validField, invalidField));
 		properties.setBusinessValidationOverride(List.of(classMapping));
 
-		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties, false);
+		GeneratedClassMetadataCache cache = new GeneratedClassMetadataCache(properties);
 
-		assertThat(cache.getResolvedMappings()).hasSize(1);
-		assertThat(cache.getResolvedMappings().get(0).fields())
-			.singleElement()
-			.extracting(ResolvedFieldMapping::fieldName)
-			.isEqualTo("name");
+		assertSingleResolvedField(cache, "name");
 	}
 
 	@Test
@@ -410,6 +432,14 @@ public class GeneratedClassMetadataCacheTests {
 
 	private GeneratedClassMetadataCache cache(List<ValidationOverrideContributor> contributors) {
 		return new GeneratedClassMetadataCache(new ValidationOverrideRegistry(contributors));
+	}
+
+	private void assertSingleResolvedField(GeneratedClassMetadataCache cache, String expectedFieldName) {
+		assertThat(cache.getResolvedMappings()).singleElement().satisfies(classMapping ->
+			assertThat(classMapping.fields())
+				.singleElement()
+				.extracting(ResolvedFieldMapping::fieldName)
+				.isEqualTo(expectedFieldName));
 	}
 
 	private ValidationOverrideContributor contributor(ClassValidationOverride... overrides) {

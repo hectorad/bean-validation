@@ -21,8 +21,6 @@ public class ValidationProperties {
 
     private boolean validationEnabled = true;
 
-    private boolean failOnError = true;
-
     @Valid
     private RequestValidationBypass requestValidationBypass = new RequestValidationBypass();
 
@@ -44,14 +42,6 @@ public class ValidationProperties {
 
     public void setValidationEnabled(boolean validationEnabled) {
         this.validationEnabled = validationEnabled;
-    }
-
-    public boolean isFailOnError() {
-        return failOnError;
-    }
-
-    public void setFailOnError(boolean failOnError) {
-        this.failOnError = failOnError;
     }
 
     public RequestValidationBypass getRequestValidationBypass() {

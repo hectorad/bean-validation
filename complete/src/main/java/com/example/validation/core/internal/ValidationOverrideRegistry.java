@@ -12,7 +12,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class ValidationOverrideRegistry {
+
+	private static final Logger log = LoggerFactory.getLogger(ValidationOverrideRegistry.class);
 
 	private final Map<String, Map<String, List<RegisteredConstraintOverride>>> contributionsByTarget;
 
@@ -58,33 +63,54 @@ public class ValidationOverrideRegistry {
 			return;
 		}
 
-		List<ClassValidationOverride> classOverrides = contributor.getValidationOverrides();
+		String sourceId = sourceId(contributor);
+		List<ClassValidationOverride> classOverrides;
+		try {
+			classOverrides = contributor.getValidationOverrides();
+		}
+		catch (RuntimeException exception) {
+			log.warn(
+				"Skipping validation override contributor source={} due to error while loading overrides: {}",
+				sourceId,
+				exception.getMessage());
+			return;
+		}
 		if (classOverrides == null || classOverrides.isEmpty()) {
 			return;
 		}
 
 		Set<String> contributorClassNames = new LinkedHashSet<>();
-		String sourceId = contributor.sourceId();
 		for (ClassValidationOverride classOverride : classOverrides) {
 			if (classOverride == null || classOverride.className() == null) {
-				throw new IllegalStateException("Each validation override class mapping must define a non-empty className.");
+				log.warn(
+					"Skipping validation override class mapping from source={} because className is missing.",
+					sourceId);
+				continue;
 			}
 			if (!contributorClassNames.add(classOverride.className())) {
-				throw new IllegalStateException(
-					"Duplicate class mapping found in validation overrides for source "
-						+ sourceId + ": " + classOverride.className());
+				log.warn(
+					"Skipping duplicate validation override class mapping from source={} for class={}.",
+					sourceId,
+					classOverride.className());
+				continue;
 			}
 
 			Set<String> fieldNames = new LinkedHashSet<>();
 			for (FieldValidationOverride fieldOverride : classOverride.fields()) {
 				if (fieldOverride == null || fieldOverride.fieldName() == null) {
-					throw new IllegalStateException(
-						"Each field override must define a non-empty fieldName for class: " + classOverride.className());
+					log.warn(
+						"Skipping validation override field mapping from source={} for class={} because fieldName is missing.",
+						sourceId,
+						classOverride.className());
+					continue;
 				}
 				if (!fieldNames.add(fieldOverride.fieldName())) {
-					throw new IllegalStateException(
-						"Duplicate field mapping found for class " + classOverride.className()
-							+ " in source " + sourceId + ": " + fieldOverride.fieldName());
+					log.warn(
+						"Skipping duplicate validation override field mapping from source={} for class={}, field={}.",
+						sourceId,
+						classOverride.className(),
+						fieldOverride.fieldName());
+					continue;
 				}
 
 				index
@@ -93,6 +119,27 @@ public class ValidationOverrideRegistry {
 					.add(new RegisteredConstraintOverride(sourceId, fieldOverride.constraints()));
 			}
 		}
+	}
+
+	private String sourceId(ValidationOverrideContributor contributor) {
+		String declaredSourceId;
+		try {
+			declaredSourceId = contributor.sourceId();
+		}
+		catch (RuntimeException exception) {
+			log.warn(
+				"Contributor {} threw while resolving sourceId; using class name instead. error={}",
+				contributor.getClass().getName(),
+				exception.getMessage());
+			return contributor.getClass().getName();
+		}
+		if (declaredSourceId == null || declaredSourceId.isBlank()) {
+			log.warn(
+				"Contributor {} returned a blank sourceId; using class name instead.",
+				contributor.getClass().getName());
+			return contributor.getClass().getName();
+		}
+		return declaredSourceId;
 	}
 
 	private Map<String, Map<String, List<RegisteredConstraintOverride>>> deepCopy(

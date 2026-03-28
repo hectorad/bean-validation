@@ -90,7 +90,7 @@ public class ValidationAutoConfiguration {
             ValidationOverrideRegistry validationOverrideRegistry,
             ValidationProperties validationProperties
     ) {
-        return new GeneratedClassMetadataCache(validationOverrideRegistry, validationProperties.isFailOnError());
+        return new GeneratedClassMetadataCache(validationOverrideRegistry);
     }
 
     @Bean
@@ -106,8 +106,7 @@ public class ValidationAutoConfiguration {
         return new ConfigDrivenConstraintMappingContributor(
                 validationOverrideRegistry,
                 generatedClassMetadataCache,
-                constraintMergeService,
-                validationProperties.isFailOnError());
+                constraintMergeService);
     }
 
     @Bean
@@ -187,19 +186,17 @@ public class ValidationAutoConfiguration {
             ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
             ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
     ) {
-        boolean failOnError = validationProperties.isFailOnError();
         ValidationOverrideRegistry validationOverrideRegistry = validationOverrideRegistryProvider
                 .getIfAvailable(() -> new ValidationOverrideRegistry(
                         defaultValidationOverrideContributors(validationProperties, validationOverrideContributors)));
         GeneratedClassMetadataCache generatedClassMetadataCache = generatedClassMetadataCacheProvider
-                .getIfAvailable(() -> new GeneratedClassMetadataCache(validationOverrideRegistry, failOnError));
+                .getIfAvailable(() -> new GeneratedClassMetadataCache(validationOverrideRegistry));
         ConstraintMergeService constraintMergeService = constraintMergeServiceProvider
                 .getIfAvailable(ConstraintMergeService::new);
         return new ConfigDrivenConstraintMappingContributor(
                 validationOverrideRegistry,
                 generatedClassMetadataCache,
-                constraintMergeService,
-                failOnError);
+                constraintMergeService);
     }
 
     private static List<ValidationOverrideContributor> defaultValidationOverrideContributors(

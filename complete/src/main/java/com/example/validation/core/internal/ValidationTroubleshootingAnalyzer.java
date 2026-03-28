@@ -44,13 +44,24 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 				List<RegisteredConstraintOverride> configuredConstraints = validationOverrideRegistry.contributionsFor(
 					classMapping.className(),
 					fieldMapping.fieldName());
-				EffectiveFieldConstraints effective = constraintMergeService.merge(
-					fieldMapping.baselineConstraints(),
-					configuredConstraints,
-					classMapping.className(),
-					fieldMapping.fieldName());
+				try {
+					EffectiveFieldConstraints effective = constraintMergeService.merge(
+						fieldMapping.baselineConstraints(),
+						configuredConstraints,
+						classMapping.className(),
+						fieldMapping.fieldName());
 
-				appendFieldReport(report, fieldMapping, configuredConstraints, effective);
+					appendFieldReport(report, fieldMapping, configuredConstraints, effective);
+				}
+				catch (RuntimeException exception) {
+					log.warn(
+						"Skipping validation troubleshooting entry for class={}, field={}, sources={} due to error: {}",
+						classMapping.className(),
+						fieldMapping.fieldName(),
+						renderSources(configuredConstraints),
+						exception.getMessage());
+					appendSkippedFieldReport(report, fieldMapping, configuredConstraints, exception.getMessage());
+				}
 			}
 		}
 
@@ -86,6 +97,23 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 			effective.sizeMax(), effective.sizeMaxMessage());
 		appendPatterns(report, baseline, configuredConstraints, effective);
 		appendExtensions(report, configuredConstraints, effective);
+	}
+
+	private void appendSkippedFieldReport(
+		StringBuilder report,
+		ResolvedFieldMapping fieldMapping,
+		List<RegisteredConstraintOverride> configuredConstraints,
+		String error
+	) {
+		report.append("  Field: ").append(fieldMapping.fieldName()).append('\n');
+		report.append("    ").append(padRight("contributors:", 14))
+			.append(configuredConstraints.size());
+		if (!configuredConstraints.isEmpty()) {
+			report.append(" ").append(renderSources(configuredConstraints));
+		}
+		report.append('\n');
+		report.append("    ").append(padRight("status:", 14))
+			.append("skipped | error=\"").append(error).append('"').append('\n');
 	}
 
 	private void appendBoolean(

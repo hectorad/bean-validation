@@ -563,7 +563,7 @@ So configured size values are validated and converted:
 - values larger than `Integer.MAX_VALUE` are rejected
 - otherwise they are converted with `Math.toIntExact(...)`
 
-This is a defensive boundary so invalid configuration fails fast.
+This is a defensive boundary so invalid configuration is detected early; callers log a warning and skip the bad mapping.
 
 ### Incompatible merged ranges are rejected
 

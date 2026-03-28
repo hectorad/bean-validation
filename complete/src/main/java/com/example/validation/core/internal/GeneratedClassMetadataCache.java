@@ -62,22 +62,11 @@ public class GeneratedClassMetadataCache {
 
 	private final List<ResolvedClassMapping> resolvedClassMappings;
 
-	private final boolean failOnError;
-
 	public GeneratedClassMetadataCache(ValidationProperties validationProperties) {
-		this(validationProperties, true);
-	}
-
-	public GeneratedClassMetadataCache(ValidationProperties validationProperties, boolean failOnError) {
-		this(new ValidationOverrideRegistry(List.of(new PropertiesValidationOverrideContributor(validationProperties))), failOnError);
+		this(new ValidationOverrideRegistry(List.of(new PropertiesValidationOverrideContributor(validationProperties))));
 	}
 
 	public GeneratedClassMetadataCache(ValidationOverrideRegistry validationOverrideRegistry) {
-		this(validationOverrideRegistry, true);
-	}
-
-	public GeneratedClassMetadataCache(ValidationOverrideRegistry validationOverrideRegistry, boolean failOnError) {
-		this.failOnError = failOnError;
 		this.resolvedClassMappingsByName = buildResolvedMappings(validationOverrideRegistry);
 		this.resolvedClassMappings = List.copyOf(this.resolvedClassMappingsByName.values());
 	}
@@ -99,46 +88,62 @@ public class GeneratedClassMetadataCache {
 
 		for (String className : validationOverrideRegistry.classNames()) {
 			try {
-				if (mappingIndex.containsKey(className)) {
-					throw new IllegalStateException("Duplicate class mapping found in validation configuration: " + className);
-				}
-
 				Class<?> clazz = resolveClass(className);
 				Map<String, ResolvedFieldMapping> fieldMappingIndex = new LinkedHashMap<>();
 				for (String fieldName : validationOverrideRegistry.fieldNames(className)) {
+					List<RegisteredConstraintOverride> constraints =
+						validationOverrideRegistry.contributionsFor(className, fieldName);
 					try {
-						if (fieldMappingIndex.containsKey(fieldName)) {
-							throw new IllegalStateException("Duplicate field mapping found for class " + className + ": " + fieldName);
-						}
-
 						ResolvedFieldMapping resolvedFieldMapping = resolveFieldMapping(
 							clazz,
 							className,
 							fieldName,
-							validationOverrideRegistry.contributionsFor(className, fieldName));
+							constraints);
 						fieldMappingIndex.put(fieldName, resolvedFieldMapping);
 					}
 					catch (RuntimeException exception) {
-						if (failOnError) {
-							throw exception;
-						}
-						log.warn("Skipping field mapping due to validation configuration error: {}", exception.getMessage());
+						log.warn(
+							"Skipping validation override field mapping for class={}, field={}, sources={} due to error: {}",
+							className,
+							fieldName,
+							renderSources(constraints),
+							exception.getMessage());
 					}
 				}
 
-				mappingIndex.put(
-					className,
-					new ResolvedClassMapping(className, clazz, new ArrayList<>(fieldMappingIndex.values())));
+				if (!fieldMappingIndex.isEmpty()) {
+					mappingIndex.put(
+						className,
+						new ResolvedClassMapping(className, clazz, new ArrayList<>(fieldMappingIndex.values())));
+				}
 			}
 			catch (RuntimeException exception) {
-				if (failOnError) {
-					throw exception;
-				}
-				log.warn("Skipping class mapping due to validation configuration error: {}", exception.getMessage());
+				log.warn(
+					"Skipping validation override class mapping for class={}, sources={} due to error: {}",
+					className,
+					renderSources(validationOverrideRegistry, className),
+					exception.getMessage());
 			}
 		}
 
 		return Collections.unmodifiableMap(mappingIndex);
+	}
+
+	private String renderSources(ValidationOverrideRegistry validationOverrideRegistry, String className) {
+		return validationOverrideRegistry.fieldNames(className).stream()
+			.flatMap(fieldName -> validationOverrideRegistry.contributionsFor(className, fieldName).stream())
+			.map(RegisteredConstraintOverride::sourceId)
+			.distinct()
+			.toList()
+			.toString();
+	}
+
+	private String renderSources(List<RegisteredConstraintOverride> constraints) {
+		return constraints.stream()
+			.map(RegisteredConstraintOverride::sourceId)
+			.distinct()
+			.toList()
+			.toString();
 	}
 
 	private ResolvedFieldMapping resolveFieldMapping(

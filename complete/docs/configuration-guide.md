@@ -172,7 +172,6 @@ Each class mapping identifies a Java class by its fully-qualified name and lists
 | Property | Type | Default | Description |
 |---|---|---|---|
 | `validation-enabled` | `boolean` | `true` | Global kill switch. When `false`, Bean Validation is disabled for MVC, method validation, and direct validator usage. |
-| `fail-on-error` | `boolean` | `true` | Controls whether invalid override metadata fails fast during startup. |
 | `request-validation-bypass.enabled` | `boolean` | `false` | Enables a per-request validation bypass controlled by a trusted request header. |
 | `request-validation-bypass.header-name` | `String` | `X-Skip-Validation` | Header name checked on the current servlet request. |
 | `request-validation-bypass.header-value` | `String` | `true` | Exact header value required to bypass validation. |
@@ -326,7 +325,7 @@ decimal-min:
   message: Salary must be greater than 1000.50
 ```
 
-**Important:** Setting `inclusive` without a corresponding `value` causes a startup failure.
+**Important:** Setting `inclusive` without a corresponding `value` makes that override invalid; the framework logs a warning and skips the affected mapping.
 
 **Merge rule:** Competes alongside `min` for the strictest lower bound. When two bounds have the same numeric value, exclusive is stricter than inclusive.
 
@@ -485,7 +484,7 @@ The merge produces:
 | sizeMax | `30` | `30` | `30` | min(30, 30) -- equal |
 | patterns | `^[A-Za-z ]+$` | `^[A-Za-z ]+$` | Both active | Patterns accumulate |
 
-> **Fail-fast:** If the merged min exceeds the merged max (for numeric or size bounds), the application fails to start. This is intentional to catch configuration errors early.
+> **Invalid merged bounds:** If the merged min exceeds the merged max (for numeric or size bounds), the framework logs a warning and skips the affected field mapping. Other valid mappings still apply.
 
 ---
 
@@ -639,7 +638,7 @@ public FieldConstraintContributor myCustomContributor() {
 
 ## Error Handling
 
-The framework validates all configuration eagerly at startup. If any validation fails, the Spring application context fails to initialize.
+Configuration binding remains strict, but post-binding override processing is tolerant. Structurally invalid configuration still fails startup; invalid override mappings are logged and skipped so other valid mappings can continue to apply during startup and refresh.
 
 ### Configuration Binding Errors
 
@@ -651,18 +650,27 @@ Spring validates `ValidationProperties` on binding:
 | `fields` list is empty | No fields configured for a class |
 | `field-name` is blank | Missing or empty field name |
 
-### Metadata Resolution Errors
+### Metadata Resolution Warnings
 
-`GeneratedClassMetadataCache` validates that configured classes and fields exist:
+`GeneratedClassMetadataCache` validates that configured classes and fields exist. When a mapping is invalid, it is skipped and a warning is logged:
 
 | Error Message | Cause |
 |---|---|
 | `Configured class was not found: <className>` | Class not on classpath (check for typos) |
 | `Configured field was not found. class=<class>, field=<field>` | Field does not exist on the class |
-| `Duplicate class mapping found in validation configuration: <className>` | Same class listed twice |
-| `Duplicate field mapping found for class <class>: <field>` | Same field listed twice for one class |
 
-### Type Compatibility Errors
+### Contributor/Registry Warnings
+
+Duplicate or malformed contributor entries are also skipped with warnings:
+
+| Warning Pattern | Cause |
+|---|---|
+| `Skipping duplicate validation override class mapping...` | Same class listed twice within one contributor |
+| `Skipping duplicate validation override field mapping...` | Same field listed twice within one contributor/class |
+| `className is missing` | Contributor entry omitted or blanked the class name |
+| `fieldName is missing` | Contributor entry omitted or blanked the field name |
+
+### Type Compatibility Warnings
 
 | Error Message Pattern | Cause |
 |---|---|
@@ -671,7 +679,7 @@ Spring validates `ValidationProperties` on binding:
 | `Constraint size is not supported for...` | `size` on a non-container field |
 | `Constraint pattern is not supported for...` | `pattern` on a non-String field |
 
-### Merge-Time Errors
+### Merge-Time Warnings
 
 | Error Message Pattern | Cause |
 |---|---|
@@ -686,7 +694,7 @@ Spring validates `ValidationProperties` on binding:
 ### Example: Invalid Range
 
 ```yaml
-# This causes a startup failure:
+# This mapping is skipped with a warning:
 # baseline @Min(18) stays at 18, config max is 10 -> 18 > 10
 - field-name: age
   constraints:
@@ -694,7 +702,7 @@ Spring validates `ValidationProperties` on binding:
       value: 10
 ```
 
-Error: `Invalid numeric constraints. effectiveMin > effectiveMax for class=..., field=age, effectiveMin=18 (inclusive=true), effectiveMax=10 (inclusive=true)`
+Warning: `Invalid numeric constraints. effectiveMin > effectiveMax for class=..., field=age, effectiveMin=18 (inclusive=true), effectiveMax=10 (inclusive=true)`
 
 ---
 
@@ -757,11 +765,11 @@ For a detailed walkthrough of the internal pipeline, see [validation-constraint-
 **My override seems to have no effect.**
 The merge algorithm always selects the stricter value. If your configured value is less strict than the annotation baseline (e.g., config `min: 10` but annotation says `@Min(18)`), the baseline wins.
 
-**My application fails to start with "Configured class was not found."**
-Ensure `full-class-name` is the fully-qualified class name (e.g., `com.example.MyForm`, not `MyForm`) and the class is on the classpath.
+**I see "Configured class was not found."**
+Ensure `full-class-name` is the fully-qualified class name (e.g., `com.example.MyForm`, not `MyForm`) and the class is on the classpath. The invalid mapping is skipped; other valid mappings continue to load.
 
-**I get "Configured field was not found."**
-The `field-name` must match the Java field name exactly (case-sensitive). It must be a declared field on the class (or a superclass), not a method-only property.
+**I see "Configured field was not found."**
+The `field-name` must match the Java field name exactly (case-sensitive). It must be a declared field on the class (or a superclass), not a method-only property. The invalid mapping is skipped and does not block startup or refresh.
 
 **I get "Constraint notBlank is not supported for field type Integer."**
 `not-blank` only works on `CharSequence` (String) fields. Remove the `not-blank` constraint from the numeric field configuration.

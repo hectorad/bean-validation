@@ -1,16 +1,19 @@
 package com.example.validation.core.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.example.validation.core.spi.ClassValidationOverride;
 import com.example.validation.core.spi.ConstraintOverrideSet;
 import com.example.validation.core.spi.FieldValidationOverride;
 import com.example.validation.core.spi.ValidationOverrideContributor;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 
 import java.util.List;
 
+@ExtendWith(OutputCaptureExtension.class)
 class ValidationOverrideRegistryTests {
 
 	@Test
@@ -27,22 +30,52 @@ class ValidationOverrideRegistryTests {
 	}
 
 	@Test
-	void shouldFailWhenDuplicateClassMappingExistsInsideSingleContributor() {
-		assertThatThrownBy(() -> new ValidationOverrideRegistry(List.of(contributor(
+	void shouldWarnAndKeepFirstClassMappingWhenDuplicateClassMappingExistsInsideSingleContributor(CapturedOutput output) {
+		ValidationOverrideRegistry registry = new ValidationOverrideRegistry(List.of(contributor(
 			"duplicate-class",
 			classOverride(SampleTarget.class, fieldOverride("name")),
-			classOverride(SampleTarget.class, fieldOverride("age"))))))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Duplicate class mapping");
+			classOverride(SampleTarget.class, fieldOverride("age")))));
+
+		assertThat(registry.classNames()).containsExactly(SampleTarget.class.getName());
+		assertThat(registry.fieldNames(SampleTarget.class.getName())).containsExactly("name");
+		assertThat(output.getOut())
+			.contains("Skipping duplicate validation override class mapping")
+			.contains("source=duplicate-class")
+			.contains("class=" + SampleTarget.class.getName());
 	}
 
 	@Test
-	void shouldFailWhenDuplicateFieldMappingExistsInsideSingleContributor() {
-		assertThatThrownBy(() -> new ValidationOverrideRegistry(List.of(contributor(
+	void shouldWarnAndKeepFirstFieldMappingWhenDuplicateFieldMappingExistsInsideSingleContributor(CapturedOutput output) {
+		ValidationOverrideRegistry registry = new ValidationOverrideRegistry(List.of(contributor(
 			"duplicate-field",
-			classOverride(SampleTarget.class, fieldOverride("name"), fieldOverride("name"))))))
-			.isInstanceOf(IllegalStateException.class)
-			.hasMessageContaining("Duplicate field mapping");
+			classOverride(SampleTarget.class, fieldOverride("name"), fieldOverride("name")))));
+
+		assertThat(registry.classNames()).containsExactly(SampleTarget.class.getName());
+		assertThat(registry.fieldNames(SampleTarget.class.getName())).containsExactly("name");
+		assertThat(registry.contributionsFor(SampleTarget.class.getName(), "name")).singleElement();
+		assertThat(output.getOut())
+			.contains("Skipping duplicate validation override field mapping")
+			.contains("source=duplicate-field")
+			.contains("class=" + SampleTarget.class.getName())
+			.contains("field=name");
+	}
+
+	@Test
+	void shouldWarnAndSkipMalformedMappingsInsideContributor(CapturedOutput output) {
+		ValidationOverrideRegistry registry = new ValidationOverrideRegistry(List.of(contributor(
+			"malformed",
+			new ClassValidationOverride(" ", List.of(fieldOverride("name"))),
+			classOverride(
+				SampleTarget.class,
+				new FieldValidationOverride(" ", new ConstraintOverrideSet()),
+				fieldOverride("age")))));
+
+		assertThat(registry.classNames()).containsExactly(SampleTarget.class.getName());
+		assertThat(registry.fieldNames(SampleTarget.class.getName())).containsExactly("age");
+		assertThat(output.getOut())
+			.contains("Skipping validation override class mapping from source=malformed because className is missing.")
+			.contains("Skipping validation override field mapping from source=malformed for class="
+				+ SampleTarget.class.getName() + " because fieldName is missing.");
 	}
 
 	private ValidationOverrideContributor contributor(String sourceId, ClassValidationOverride... overrides) {

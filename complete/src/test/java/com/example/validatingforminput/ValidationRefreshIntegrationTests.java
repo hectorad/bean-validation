@@ -20,9 +20,12 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.cloud.context.refresh.ContextRefresher;
 import org.springframework.context.ConfigurableApplicationContext;
 import org.springframework.test.web.servlet.MockMvc;
@@ -34,6 +37,7 @@ import com.example.validation.core.api.ExternalPayloadValidator;
 import jakarta.validation.ConstraintViolationException;
 import jakarta.validation.Validator;
 
+@ExtendWith(OutputCaptureExtension.class)
 class ValidationRefreshIntegrationTests {
 
 	private static final String CONFIG_NAME = "refresh-test";
@@ -107,22 +111,25 @@ class ValidationRefreshIntegrationTests {
 	}
 
 	@Test
-	void shouldRequireAnotherRefreshAfterInvalidConfigurationIsFixed(@TempDir Path tempDir) throws Exception {
+	void shouldUseValidSubsetWhenInvalidConfigurationIsRefreshed(@TempDir Path tempDir, CapturedOutput output) throws Exception {
 		try (RunningApp app = startApp(tempDir, validationConfig(true, 25L, "X-Skip-Validation", "true"))) {
-			PersonForm form = validPerson(27);
+			PersonForm form = validPerson(20);
 
-			assertThat(app.validator().validate(form)).isEmpty();
+			assertThat(app.validator().validate(form)).isNotEmpty();
 
 			app.writeConfig(invalidValidationConfig());
 			app.refresh();
 
-			assertThatThrownBy(() -> app.validator().validate(form))
-				.hasStackTraceContaining("Configured field was not found");
+			assertThat(app.validator().validate(form)).isEmpty();
+			assertThat(output.getOut())
+				.contains("Skipping validation override field mapping")
+				.contains("class=com.example.validatingforminput.PersonForm")
+				.contains("field=doesNotExist");
 
 			app.writeConfig(validationConfig(true, 25L, "X-Skip-Validation", "true"));
 			app.refresh();
 
-			assertThat(app.validator().validate(form)).isEmpty();
+			assertThat(app.validator().validate(form)).isNotEmpty();
 		}
 	}
 
