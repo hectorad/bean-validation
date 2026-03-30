@@ -73,19 +73,11 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 						"Skipping validation override constraint mapping for class={}, field={}, sources={} due to error: {}",
 						resolvedClassMapping.className(),
 						resolvedFieldMapping.fieldName(),
-						renderSources(contributions),
+						RegisteredConstraintOverride.renderSources(contributions),
 						exception.getMessage());
 				}
 			}
 		}
-	}
-
-	private String renderSources(List<RegisteredConstraintOverride> contributions) {
-		return contributions.stream()
-			.map(RegisteredConstraintOverride::sourceId)
-			.distinct()
-			.toList()
-			.toString();
 	}
 
 	private void applyConstraints(

@@ -52,7 +52,7 @@ public class ValidationOverrideRegistry {
 		for (ValidationOverrideContributor contributor : safeContributors) {
 			registerContributor(index, contributor);
 		}
-		return deepCopy(index);
+		return freeze(index);
 	}
 
 	private void registerContributor(
@@ -142,17 +142,17 @@ public class ValidationOverrideRegistry {
 		return declaredSourceId;
 	}
 
-	private Map<String, Map<String, List<RegisteredConstraintOverride>>> deepCopy(
+	private Map<String, Map<String, List<RegisteredConstraintOverride>>> freeze(
 		Map<String, Map<String, List<RegisteredConstraintOverride>>> source
 	) {
-		Map<String, Map<String, List<RegisteredConstraintOverride>>> copy = new LinkedHashMap<>();
+		Map<String, Map<String, List<RegisteredConstraintOverride>>> result = new LinkedHashMap<>();
 		for (Map.Entry<String, Map<String, List<RegisteredConstraintOverride>>> classEntry : source.entrySet()) {
 			Map<String, List<RegisteredConstraintOverride>> fields = new LinkedHashMap<>();
 			for (Map.Entry<String, List<RegisteredConstraintOverride>> fieldEntry : classEntry.getValue().entrySet()) {
-				fields.put(fieldEntry.getKey(), List.copyOf(fieldEntry.getValue()));
+				fields.put(fieldEntry.getKey(), Collections.unmodifiableList(fieldEntry.getValue()));
 			}
-			copy.put(classEntry.getKey(), Collections.unmodifiableMap(fields));
+			result.put(classEntry.getKey(), Collections.unmodifiableMap(fields));
 		}
-		return Collections.unmodifiableMap(copy);
+		return Collections.unmodifiableMap(result);
 	}
 }

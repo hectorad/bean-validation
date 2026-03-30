@@ -138,7 +138,7 @@ public class ConstraintMergeService {
 		}
 		List<ConstraintOverrideSet> safeContributions = new ArrayList<>();
 		for (RegisteredConstraintOverride contribution : contributions) {
-			safeContributions.add(contribution == null ? new ConstraintOverrideSet() : contribution.constraints());
+			safeContributions.add(contribution.constraints());
 		}
 		return safeContributions;
 	}

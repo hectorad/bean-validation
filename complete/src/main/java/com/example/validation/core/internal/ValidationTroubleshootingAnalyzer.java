@@ -58,7 +58,7 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 						"Skipping validation troubleshooting entry for class={}, field={}, sources={} due to error: {}",
 						classMapping.className(),
 						fieldMapping.fieldName(),
-						renderSources(configuredConstraints),
+						RegisteredConstraintOverride.renderSources(configuredConstraints),
 						exception.getMessage());
 					appendSkippedFieldReport(report, fieldMapping, configuredConstraints, exception.getMessage());
 				}
@@ -81,7 +81,7 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 		report.append("    ").append(padRight("contributors:", 14))
 			.append(configuredConstraints.size());
 		if (!configuredConstraints.isEmpty()) {
-			report.append(" ").append(renderSources(configuredConstraints));
+			report.append(" ").append(RegisteredConstraintOverride.renderSources(configuredConstraints));
 		}
 		report.append('\n');
 
@@ -109,7 +109,7 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 		report.append("    ").append(padRight("contributors:", 14))
 			.append(configuredConstraints.size());
 		if (!configuredConstraints.isEmpty()) {
-			report.append(" ").append(renderSources(configuredConstraints));
+			report.append(" ").append(RegisteredConstraintOverride.renderSources(configuredConstraints));
 		}
 		report.append('\n');
 		report.append("    ").append(padRight("status:", 14))
@@ -275,14 +275,6 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 			}
 		}
 		return result;
-	}
-
-	private String renderSources(List<RegisteredConstraintOverride> configuredConstraints) {
-		return configuredConstraints.stream()
-			.map(RegisteredConstraintOverride::sourceId)
-			.distinct()
-			.toList()
-			.toString();
 	}
 
 	private void appendWinner(StringBuilder report, NumericBound baseline, NumericBound configured, NumericBound effective) {

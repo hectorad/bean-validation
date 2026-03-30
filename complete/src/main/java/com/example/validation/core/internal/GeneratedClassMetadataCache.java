@@ -106,7 +106,7 @@ public class GeneratedClassMetadataCache {
 							"Skipping validation override field mapping for class={}, field={}, sources={} due to error: {}",
 							className,
 							fieldName,
-							renderSources(constraints),
+							RegisteredConstraintOverride.renderSources(constraints),
 							exception.getMessage());
 					}
 				}
@@ -132,14 +132,6 @@ public class GeneratedClassMetadataCache {
 	private String renderSources(ValidationOverrideRegistry validationOverrideRegistry, String className) {
 		return validationOverrideRegistry.fieldNames(className).stream()
 			.flatMap(fieldName -> validationOverrideRegistry.contributionsFor(className, fieldName).stream())
-			.map(RegisteredConstraintOverride::sourceId)
-			.distinct()
-			.toList()
-			.toString();
-	}
-
-	private String renderSources(List<RegisteredConstraintOverride> constraints) {
-		return constraints.stream()
 			.map(RegisteredConstraintOverride::sourceId)
 			.distinct()
 			.toList()

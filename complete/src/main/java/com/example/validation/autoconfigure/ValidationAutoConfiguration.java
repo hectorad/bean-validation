@@ -87,8 +87,7 @@ public class ValidationAutoConfiguration {
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     @RefreshScope
     public GeneratedClassMetadataCache generatedClassMetadataCache(
-            ValidationOverrideRegistry validationOverrideRegistry,
-            ValidationProperties validationProperties
+            ValidationOverrideRegistry validationOverrideRegistry
     ) {
         return new GeneratedClassMetadataCache(validationOverrideRegistry);
     }
@@ -98,7 +97,6 @@ public class ValidationAutoConfiguration {
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     @RefreshScope
     public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
-            ValidationProperties validationProperties,
             ValidationOverrideRegistry validationOverrideRegistry,
             GeneratedClassMetadataCache generatedClassMetadataCache,
             ConstraintMergeService constraintMergeService
