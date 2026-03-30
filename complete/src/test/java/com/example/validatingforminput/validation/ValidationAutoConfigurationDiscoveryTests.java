@@ -56,14 +56,11 @@ class ValidationAutoConfigurationDiscoveryTests {
 			LocalValidatorFactoryBean validator = context.getBean("defaultValidator", LocalValidatorFactoryBean.class);
 
 			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
-				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
+				.isInstanceOf(NoopLocalValidatorFactoryBean.class);
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
 			assertThat(context.getBeansOfType(ValidationOverrideRegistry.class)).isEmpty();
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
 			assertThat(context.getBeansOfType(com.example.validation.core.spi.ValidationOverrideContributor.class)).isEmpty();
-			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNotNull();
-			assertThat(validator.usingContext()).isNotNull();
-			assertThat(validator.unwrap(jakarta.validation.ValidatorFactory.class)).isNotNull();
 		}
 	}
 

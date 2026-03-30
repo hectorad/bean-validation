@@ -5,6 +5,8 @@ import com.example.validation.core.internal.BeanValidationExternalPayloadValidat
 import com.example.validation.core.internal.ConfigDrivenConstraintMappingContributor;
 import com.example.validation.core.internal.ConstraintMergeService;
 import com.example.validation.core.internal.GeneratedClassMetadataCache;
+import com.example.validation.core.internal.NoopExternalPayloadValidator;
+import com.example.validation.core.internal.NoopLocalValidatorFactoryBean;
 import com.example.validation.core.internal.PropertiesValidationOverrideContributor;
 import com.example.validation.core.internal.RequestAwareValidatingLocalValidatorFactoryBean;
 import com.example.validation.core.internal.ValidationProperties;
@@ -51,6 +53,7 @@ public class ValidationAutoConfiguration {
         if (!validationProperties.isValidationEnabled()) {
             log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
                     + "No constraints will be enforced on any field. ***");
+            return new NoopLocalValidatorFactoryBean();
         }
         return configureDefaultValidator(applicationContext, customizers, validationProperties);
     }
@@ -125,8 +128,16 @@ public class ValidationAutoConfiguration {
 
     @Bean
     @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
     public ExternalPayloadValidator externalPayloadValidator(Validator validator) {
         return new BeanValidationExternalPayloadValidator(validator);
+    }
+
+    @Bean
+    @ConditionalOnMissingBean
+    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "false")
+    public ExternalPayloadValidator noopExternalPayloadValidator() {
+        return new NoopExternalPayloadValidator();
     }
 
     @Bean
