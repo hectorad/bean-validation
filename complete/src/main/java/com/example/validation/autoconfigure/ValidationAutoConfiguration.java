@@ -69,7 +69,8 @@ public class ValidationAutoConfiguration {
 
         @Bean
         @ConditionalOnMissingBean(name = "propertiesValidationOverrideContributor")
-        @RefreshScope
+        // This contributor re-reads rebound properties on demand; the downstream
+        // registry/cache/mapping beans still snapshot derived state and need refresh scope.
         ValidationOverrideContributor propertiesValidationOverrideContributor(
                 BusinessValidationOverrideProperties businessValidationOverrideProperties
         ) {
