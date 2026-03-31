@@ -65,9 +65,8 @@ com:
               - constraintType: Size
                 params:
                   min: 4
-                  minMessage: Name must have at least 4 characters
                   max: 40
-                  maxMessage: Name must have at most 40 characters
+                message: Name must be between 4 and 40 characters
               - constraintType: Pattern
                 params:
                   regexp: ^[A-Za-z]+$

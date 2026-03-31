@@ -307,10 +307,6 @@ public class ValidationProperties {
 
         private String jsonPath;
 
-        private String minMessage;
-
-        private String maxMessage;
-
         public BigDecimal getValue() {
             return value;
         }
@@ -357,22 +353,6 @@ public class ValidationProperties {
 
         public void setJsonPath(String jsonPath) {
             this.jsonPath = trimToNull(jsonPath);
-        }
-
-        public String getMinMessage() {
-            return minMessage;
-        }
-
-        public void setMinMessage(String minMessage) {
-            this.minMessage = trimToNull(minMessage);
-        }
-
-        public String getMaxMessage() {
-            return maxMessage;
-        }
-
-        public void setMaxMessage(String maxMessage) {
-            this.maxMessage = trimToNull(maxMessage);
         }
     }
 

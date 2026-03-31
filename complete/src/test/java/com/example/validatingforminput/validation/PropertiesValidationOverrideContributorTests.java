@@ -83,6 +83,44 @@ class PropertiesValidationOverrideContributorTests {
 		assertThat(constraints.getSize().getMax().getMessage()).isEqualTo("Length is invalid");
 	}
 
+	@Test
+	void shouldApplySharedSizeMessageToMinOnlyBound() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(PersonForm.class.getName());
+		classMapping.setFields(List.of(field(
+			"name",
+			constraint("Size", params -> params.setMin(3L), "Minimum length is invalid"))));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		List<ClassValidationOverride> overrides = new PropertiesValidationOverrideContributor(properties).getValidationOverrides();
+		ConstraintOverrideSet constraints = overrides.getFirst().fields().getFirst().constraints();
+
+		assertThat(constraints.getSize().getMin().getValue()).isEqualTo(3L);
+		assertThat(constraints.getSize().getMin().getMessage()).isEqualTo("Minimum length is invalid");
+		assertThat(constraints.getSize().getMax().getValue()).isNull();
+		assertThat(constraints.getSize().getMax().getMessage()).isNull();
+	}
+
+	@Test
+	void shouldApplySharedSizeMessageToMaxOnlyBound() {
+		ValidationProperties properties = new ValidationProperties();
+		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
+		classMapping.setFullClassName(PersonForm.class.getName());
+		classMapping.setFields(List.of(field(
+			"name",
+			constraint("Size", params -> params.setMax(20L), "Maximum length is invalid"))));
+		properties.setBusinessValidationOverride(List.of(classMapping));
+
+		List<ClassValidationOverride> overrides = new PropertiesValidationOverrideContributor(properties).getValidationOverrides();
+		ConstraintOverrideSet constraints = overrides.getFirst().fields().getFirst().constraints();
+
+		assertThat(constraints.getSize().getMin().getValue()).isNull();
+		assertThat(constraints.getSize().getMin().getMessage()).isNull();
+		assertThat(constraints.getSize().getMax().getValue()).isEqualTo(20L);
+		assertThat(constraints.getSize().getMax().getMessage()).isEqualTo("Maximum length is invalid");
+	}
+
 	private ValidationProperties.FieldMapping field(
 		String fieldName,
 		ValidationProperties.ConstraintMapping... constraints

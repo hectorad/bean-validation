@@ -295,15 +295,14 @@ Setting `inclusive` without `value` is invalid and causes that field mapping to 
 
 #### `Size`
 
-Use `params.min` and/or `params.max`. For messages, either provide one shared top-level `message`, or use `params.minMessage` / `params.maxMessage` for split messages.
+Use `params.min` and/or `params.max`. If you want a custom violation message, provide one top-level `message` for the entry.
 
 ```yaml
 - constraintType: Size
   params:
     min: 5
-    minMessage: Must have at least 5 characters
     max: 100
-    maxMessage: Must have at most 100 characters
+  message: Must be between 5 and 100 characters
 ```
 
 `Size` only applies to `String`, `Collection`, `Map`, and array fields. `min` uses higher-wins; `max` uses lower-wins.
@@ -411,18 +410,17 @@ Every constraint entry accepts an optional `message` property that overrides the
 
 ### Size Messages
 
-Size constraints support independent messages for `min` and `max`:
+`Size` uses the entry's top-level `message`.
 
 ```yaml
 - constraintType: Size
   params:
     min: 20
-    minMessage: Name must have at least 20 characters
     max: 30
-    maxMessage: Name must have at most 30 characters
+  message: Name must be between 20 and 30 characters
 ```
 
-When `min` and `max` have different messages, the framework emits two separate `@Size` constraints so each side displays its own message. When messages are the same (or both absent), a single `@Size` constraint covers both bounds.
+If both bounds are present, the same message is used for either a too-short or too-long violation.
 
 ### Pattern Messages
 
@@ -703,5 +701,5 @@ Each `Pattern` entry carries its own message. If you want different messages for
 **Can I use Spring profiles to vary validation overrides per environment?**
 Yes. Use standard Spring Boot profile-specific configuration files (e.g., `application-prod.yml`, `application-staging.yml`). The framework reads from whatever configuration source Spring resolves at runtime.
 
-**I see two `@Size` violation messages for the same field.**
-This happens when `Size.params.minMessage` and `Size.params.maxMessage` are different. The framework emits two separate `@Size` constraints so each bound displays its own message. If you want a single message, use the top-level `message` on the `Size` entry or set the same `minMessage` and `maxMessage`.
+**How do `Size` messages work?**
+`Size` entries accept a single top-level `message`. If the entry defines both `params.min` and `params.max`, that same message is used for either bound violation.

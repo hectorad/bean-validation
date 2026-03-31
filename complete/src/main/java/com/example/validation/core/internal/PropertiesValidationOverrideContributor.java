@@ -183,14 +183,14 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 			applyNumericConstraint(
 				target.getMin(),
 				min,
-				firstNonNull(params.getMinMessage(), sharedMessage),
+				sharedMessage,
 				true);
 		}
 		if (max != null) {
 			applyNumericConstraint(
 				target.getMax(),
 				max,
-				firstNonNull(params.getMaxMessage(), sharedMessage),
+				sharedMessage,
 				false);
 		}
 	}
@@ -245,10 +245,6 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 		catch (ArithmeticException exception) {
 			throw new IllegalArgumentException(propertyName + " must be an integer", exception);
 		}
-	}
-
-	private String firstNonNull(String primary, String fallback) {
-		return (primary != null) ? primary : fallback;
 	}
 
 	private enum ConstraintType {

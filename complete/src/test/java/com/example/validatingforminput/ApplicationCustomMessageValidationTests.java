@@ -35,9 +35,8 @@ import jakarta.validation.constraints.Size;
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[1].message=Name must not be blank",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].constraintType=Size",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.min=4",
-	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.minMessage=Name must have at least 4 characters",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.max=6",
-	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.maxMessage=Name must have at most 6 characters",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].message=Name length must be between 4 and 6 characters",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].constraintType=Pattern",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].params.regexp=^[A-Za-z]+$",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].message=Name must contain letters only",
@@ -85,19 +84,19 @@ class ApplicationCustomMessageValidationTests {
 	}
 
 	@Test
-	void shouldUseCustomSizeMinMessage() {
+	void shouldUseSharedCustomSizeMessageForTooShortValues() {
 		PersonForm form = validBaseForm();
 		form.setName("Abc");
 
-		assertViolationMessage(captureViolations(form), "name", Size.class, "Name must have at least 4 characters");
+		assertViolationMessage(captureViolations(form), "name", Size.class, "Name length must be between 4 and 6 characters");
 	}
 
 	@Test
-	void shouldUseCustomSizeMaxMessage() {
+	void shouldUseSharedCustomSizeMessageForTooLongValues() {
 		PersonForm form = validBaseForm();
 		form.setName("ABCDEFG");
 
-		assertViolationMessage(captureViolations(form), "name", Size.class, "Name must have at most 6 characters");
+		assertViolationMessage(captureViolations(form), "name", Size.class, "Name length must be between 4 and 6 characters");
 	}
 
 	@Test

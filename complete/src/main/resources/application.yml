@@ -11,9 +11,8 @@ com.ampp:
             - constraintType: Size
               params:
                 min: 20
-                minMessage: Name must have at least 20 characters
                 max: 30
-                maxMessage: Name must have at most 30 characters
+              message: Name must be between 20 and 30 characters
             - constraintType: Pattern
               params:
                 regexp: "^[A-Za-z ]+$"

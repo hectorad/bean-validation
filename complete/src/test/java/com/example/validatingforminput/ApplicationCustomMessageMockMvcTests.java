@@ -27,9 +27,8 @@ import org.springframework.validation.FieldError;
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[1].message=Name must not be blank",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].constraintType=Size",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.min=4",
-	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.minMessage=Name must have at least 4 characters",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.max=6",
-	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.maxMessage=Name must have at most 6 characters",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].message=Name length must be between 4 and 6 characters",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].constraintType=Pattern",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].params.regexp=^[A-Za-z]+$",
 	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].message=Name must contain letters only",
@@ -58,7 +57,7 @@ class ApplicationCustomMessageMockMvcTests {
 			.param("salary", "2000.00"))
 			.andExpect(model().attributeHasFieldErrors("personForm", "name"))
 			.andReturn();
-		assertThat(messagesForField(tooShortResult, "name")).contains("Name must have at least 4 characters");
+		assertThat(messagesForField(tooShortResult, "name")).contains("Name length must be between 4 and 6 characters");
 
 		MvcResult tooLongResult = mockMvc.perform(post("/")
 			.param("name", "ABCDEFG")
@@ -66,7 +65,7 @@ class ApplicationCustomMessageMockMvcTests {
 			.param("salary", "2000.00"))
 			.andExpect(model().attributeHasFieldErrors("personForm", "name"))
 			.andReturn();
-		assertThat(messagesForField(tooLongResult, "name")).contains("Name must have at most 6 characters");
+		assertThat(messagesForField(tooLongResult, "name")).contains("Name length must be between 4 and 6 characters");
 
 		MvcResult patternResult = mockMvc.perform(post("/")
 			.param("name", "Abc1")
