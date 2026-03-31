@@ -15,8 +15,8 @@ import jakarta.validation.ConstraintViolationException;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
-	"com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm",
-	"com.ampp.business-validation-override[0].fields[0].field-name=salary"
+	"com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm",
+	"com.ampp.businessValidationOverride[0].fields[0].fieldName=salary"
 })
 class ApplicationBaselineDecimalValidationTests {
 

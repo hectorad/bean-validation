@@ -86,7 +86,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
-		fieldMapping.getConstraints().getNotBlank().setValue(true);
+		fieldMapping.setConstraints(List.of(constraint("NotBlank")));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -105,7 +105,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
-		fieldMapping.getConstraints().getSize().getMin().setValue(1L);
+		fieldMapping.setConstraints(List.of(constraint("Size", params -> params.setMin(1L))));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -124,7 +124,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("age");
-		fieldMapping.getConstraints().getPattern().setRegexes(List.of("^\\d+$"));
+		fieldMapping.setConstraints(List.of(constraint("Pattern", params -> params.setRegexp("^\\d+$"))));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -143,10 +143,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("extensions");
-		ValidationProperties.ExtensionRuleConstraint extensionRule = new ValidationProperties.ExtensionRuleConstraint();
-		extensionRule.setJsonPath("$.partner.code");
-		extensionRule.setRegex("^[A-Z]+$");
-		fieldMapping.getConstraints().getExtensions().setRules(List.of(extensionRule));
+		fieldMapping.setConstraints(List.of(extensionConstraint("$.partner.code", "^[A-Z]+$")));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -165,10 +162,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("metadata");
-		ValidationProperties.ExtensionRuleConstraint extensionRule = new ValidationProperties.ExtensionRuleConstraint();
-		extensionRule.setJsonPath("$.partner.code");
-		extensionRule.setRegex("^[A-Z]+$");
-		fieldMapping.getConstraints().getExtensions().setRules(List.of(extensionRule));
+		fieldMapping.setConstraints(List.of(extensionConstraint("$.partner.code", "^[A-Z]+$")));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -189,7 +183,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("active");
-		fieldMapping.getConstraints().getMin().setValue(1L);
+		fieldMapping.setConstraints(List.of(constraint("Min", params -> params.setValue(java.math.BigDecimal.ONE))));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -275,7 +269,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("ratio");
-		fieldMapping.getConstraints().getDecimalMin().setValue(new java.math.BigDecimal("1.5"));
+		fieldMapping.setConstraints(List.of(constraint("DecimalMin", params -> params.setValue(new java.math.BigDecimal("1.5")))));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -395,7 +389,7 @@ public class GeneratedClassMetadataCacheTests {
 
 		ValidationProperties.FieldMapping invalidField = new ValidationProperties.FieldMapping();
 		invalidField.setFieldName("age");
-		invalidField.getConstraints().getNotBlank().setValue(true);
+		invalidField.setConstraints(List.of(constraint("NotBlank")));
 
 		classMapping.setFields(List.of(validField, invalidField));
 		properties.setBusinessValidationOverride(List.of(classMapping));
@@ -454,6 +448,30 @@ public class GeneratedClassMetadataCacheTests {
 		ConstraintOverrideSet constraints = new ConstraintOverrideSet();
 		customizer.accept(constraints);
 		return new FieldValidationOverride(fieldName, constraints);
+	}
+
+	private ValidationProperties.ConstraintMapping constraint(String constraintType) {
+		return constraint(constraintType, params -> {
+		});
+	}
+
+	private ValidationProperties.ConstraintMapping constraint(
+		String constraintType,
+		Consumer<ValidationProperties.ConstraintParameters> customizer
+	) {
+		ValidationProperties.ConstraintMapping constraint = new ValidationProperties.ConstraintMapping();
+		constraint.setConstraintType(constraintType);
+		ValidationProperties.ConstraintParameters params = new ValidationProperties.ConstraintParameters();
+		customizer.accept(params);
+		constraint.setParams(params);
+		return constraint;
+	}
+
+	private ValidationProperties.ConstraintMapping extensionConstraint(String jsonPath, String regexp) {
+		return constraint("Extensions", params -> {
+			params.setJsonPath(jsonPath);
+			params.setRegexp(regexp);
+		});
 	}
 
 	private static final class UnsupportedConstraintTarget {

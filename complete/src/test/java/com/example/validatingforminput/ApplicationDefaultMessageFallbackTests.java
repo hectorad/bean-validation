@@ -20,11 +20,13 @@ import jakarta.validation.constraints.Pattern;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
-	"com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm",
-	"com.ampp.business-validation-override[0].fields[0].field-name=name",
-	"com.ampp.business-validation-override[0].fields[0].constraints.pattern.regexes[0]=^[A-Za-z]+$",
-	"com.ampp.business-validation-override[0].fields[1].field-name=age",
-	"com.ampp.business-validation-override[0].fields[1].constraints.min.value=25"
+	"com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm",
+	"com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Pattern",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Za-z]+$",
+	"com.ampp.businessValidationOverride[0].fields[1].fieldName=age",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[0].constraintType=Min",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[0].params.value=25"
 })
 class ApplicationDefaultMessageFallbackTests {
 

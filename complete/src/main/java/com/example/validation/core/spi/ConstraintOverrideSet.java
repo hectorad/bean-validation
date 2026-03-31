@@ -201,16 +201,61 @@ public class ConstraintOverrideSet {
 
 	public static class PatternConstraint {
 
-		private List<String> regexes = new ArrayList<>();
+		private List<PatternRuleConfig> rules = new ArrayList<>();
 
 		private String message;
 
 		public List<String> getRegexes() {
+			List<String> regexes = new ArrayList<>();
+			for (PatternRuleConfig rule : rules) {
+				regexes.add(rule.getRegex());
+			}
 			return regexes;
 		}
 
 		public void setRegexes(List<String> regexes) {
-			this.regexes = copyList(regexes);
+			List<PatternRuleConfig> convertedRules = new ArrayList<>();
+			for (String regex : copyList(regexes)) {
+				PatternRuleConfig rule = new PatternRuleConfig();
+				rule.setRegex(regex);
+				rule.setMessage(message);
+				convertedRules.add(rule);
+			}
+			this.rules = convertedRules;
+		}
+
+		public String getMessage() {
+			return message;
+		}
+
+		public void setMessage(String message) {
+			this.message = trimToNull(message);
+			for (PatternRuleConfig rule : rules) {
+				rule.setMessage(this.message);
+			}
+		}
+
+		public List<PatternRuleConfig> getRules() {
+			return rules;
+		}
+
+		public void setRules(List<PatternRuleConfig> rules) {
+			this.rules = copyList(rules);
+		}
+	}
+
+	public static class PatternRuleConfig {
+
+		private String regex;
+
+		private String message;
+
+		public String getRegex() {
+			return regex;
+		}
+
+		public void setRegex(String regex) {
+			this.regex = trimToNull(regex);
 		}
 
 		public String getMessage() {

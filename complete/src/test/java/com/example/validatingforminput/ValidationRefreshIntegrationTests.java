@@ -55,7 +55,7 @@ class ValidationRefreshIntegrationTests {
 			app.writeConfig(validationConfig(true, 30L, "X-Skip-Validation", "true"));
 			Set<String> refreshedKeys = app.refresh();
 
-			assertThat(refreshedKeys).contains("com.ampp.business-validation-override[0].fields[0].constraints.min.value");
+			assertThat(refreshedKeys).contains("com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.value");
 			app.mockMvc().perform(post("/validation-probe/mvc").param("name", "Robs").param("age", "27"))
 				.andExpect(status().isBadRequest());
 			assertThatThrownBy(() -> app.personValidationService().validate(form))
@@ -225,9 +225,10 @@ class ValidationRefreshIntegrationTests {
 			com.ampp.request-validation-bypass.enabled=true
 			com.ampp.request-validation-bypass.header-name=%s
 			com.ampp.request-validation-bypass.header-value=%s
-			com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm
-			com.ampp.business-validation-override[0].fields[0].field-name=age
-			com.ampp.business-validation-override[0].fields[0].constraints.min.value=%s
+			com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm
+			com.ampp.businessValidationOverride[0].fields[0].fieldName=age
+			com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Min
+			com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.value=%s
 			""".formatted(validationEnabled, bypassHeaderName, bypassHeaderValue, minimumAge);
 	}
 
@@ -237,9 +238,10 @@ class ValidationRefreshIntegrationTests {
 			com.ampp.request-validation-bypass.enabled=true
 			com.ampp.request-validation-bypass.header-name=X-Skip-Validation
 			com.ampp.request-validation-bypass.header-value=true
-			com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm
-			com.ampp.business-validation-override[0].fields[0].field-name=doesNotExist
-			com.ampp.business-validation-override[0].fields[0].constraints.min.value=30
+			com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm
+			com.ampp.businessValidationOverride[0].fields[0].fieldName=doesNotExist
+			com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Min
+			com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.value=30
 			""";
 	}
 

@@ -26,7 +26,12 @@ class ConfigDrivenConstraintMappingContributorTests {
 
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
 		fieldMapping.setFieldName("name");
-		fieldMapping.getConstraints().getPattern().setRegexes(List.of("["));
+		ValidationProperties.ConstraintMapping constraint = new ValidationProperties.ConstraintMapping();
+		constraint.setConstraintType("Pattern");
+		ValidationProperties.ConstraintParameters params = new ValidationProperties.ConstraintParameters();
+		params.setRegexp("[");
+		constraint.setParams(params);
+		fieldMapping.setConstraints(List.of(constraint));
 
 		classMapping.setFields(List.of(fieldMapping));
 		properties.setBusinessValidationOverride(List.of(classMapping));

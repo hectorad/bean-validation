@@ -19,24 +19,30 @@ import org.springframework.validation.FieldError;
 
 @ExtendWith(SpringExtension.class)
 @SpringBootTest(properties = {
-	"com.ampp.business-validation-override[0].full-class-name=com.example.validatingforminput.PersonForm",
-	"com.ampp.business-validation-override[0].fields[0].field-name=name",
-	"com.ampp.business-validation-override[0].fields[0].constraints.not-null.value=true",
-	"com.ampp.business-validation-override[0].fields[0].constraints.not-null.message=Name is required",
-	"com.ampp.business-validation-override[0].fields[0].constraints.not-blank.value=true",
-	"com.ampp.business-validation-override[0].fields[0].constraints.not-blank.message=Name must not be blank",
-	"com.ampp.business-validation-override[0].fields[0].constraints.size.min.value=4",
-	"com.ampp.business-validation-override[0].fields[0].constraints.size.min.message=Name must have at least 4 characters",
-	"com.ampp.business-validation-override[0].fields[0].constraints.size.max.value=6",
-	"com.ampp.business-validation-override[0].fields[0].constraints.size.max.message=Name must have at most 6 characters",
-	"com.ampp.business-validation-override[0].fields[0].constraints.pattern.regexes[0]=^[A-Za-z]+$",
-	"com.ampp.business-validation-override[0].fields[0].constraints.pattern.message=Name must contain letters only",
-	"com.ampp.business-validation-override[0].fields[1].field-name=age",
-	"com.ampp.business-validation-override[0].fields[1].constraints.min.value=25",
-	"com.ampp.business-validation-override[0].fields[1].constraints.max.value=60",
-	"com.ampp.business-validation-override[0].fields[2].field-name=salary",
-	"com.ampp.business-validation-override[0].fields[2].constraints.decimal-min.value=1000.01",
-	"com.ampp.business-validation-override[0].fields[2].constraints.decimal-max.value=250000.00"
+	"com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm",
+	"com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=NotNull",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[0].message=Name is required",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[1].constraintType=NotBlank",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[1].message=Name must not be blank",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].constraintType=Size",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.min=4",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.minMessage=Name must have at least 4 characters",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.max=6",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[2].params.maxMessage=Name must have at most 6 characters",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].constraintType=Pattern",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].params.regexp=^[A-Za-z]+$",
+	"com.ampp.businessValidationOverride[0].fields[0].constraints[3].message=Name must contain letters only",
+	"com.ampp.businessValidationOverride[0].fields[1].fieldName=age",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[0].constraintType=Min",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[0].params.value=25",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[1].constraintType=Max",
+	"com.ampp.businessValidationOverride[0].fields[1].constraints[1].params.value=60",
+	"com.ampp.businessValidationOverride[0].fields[2].fieldName=salary",
+	"com.ampp.businessValidationOverride[0].fields[2].constraints[0].constraintType=DecimalMin",
+	"com.ampp.businessValidationOverride[0].fields[2].constraints[0].params.value=1000.01",
+	"com.ampp.businessValidationOverride[0].fields[2].constraints[1].constraintType=DecimalMax",
+	"com.ampp.businessValidationOverride[0].fields[2].constraints[1].params.value=250000.00"
 })
 @AutoConfigureMockMvc
 class ApplicationCustomMessageMockMvcTests {

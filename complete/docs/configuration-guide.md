@@ -107,18 +107,19 @@ public class PersonForm {
 
 ```yaml
 com.ampp:
-  business-validation-override:
-    - full-class-name: com.example.validatingforminput.PersonForm
+  businessValidationOverride:
+    - fullClassName: com.example.validatingforminput.PersonForm
       fields:
-        - field-name: name
+        - fieldName: name
           constraints:
-            size:
-              min:
-                value: 5
-        - field-name: age
+            - constraintType: Size
+              params:
+                min: 5
+        - fieldName: age
           constraints:
-            min:
-              value: 21
+            - constraintType: Min
+              params:
+                value: 21
 ```
 
 ### Step 3: Use validation as normal
@@ -146,7 +147,7 @@ The framework merges your YAML constraints with your annotation-based constraint
 
 ### Top-Level Structure
 
-The configuration root is `com.ampp.business-validation-override`, which is a list of class mappings.
+The configuration root is `com.ampp.businessValidationOverride`, which is a list of class mappings.
 
 ```yaml
 com.ampp:
@@ -155,15 +156,18 @@ com.ampp:
     enabled: false
     header-name: X-Skip-Validation
     header-value: true
-  business-validation-override:
-    - full-class-name: <fully-qualified class name>  # required
-      fields:                                         # required, non-empty
-        - field-name: <field name>                    # required
-          constraints:                                # constraint blocks
-            # ...
+  businessValidationOverride:
+    - fullClassName: <fully-qualified class name>  # required
+      fields:                                        # required, non-empty
+        - fieldName: <field name>                   # required
+          constraints:                              # list of constraint entries
+            - constraintType: <constraint type>     # required
+              params:                               # type-specific parameters
+                # ...
+              message: <optional message>
 ```
 
-Each class mapping identifies a Java class by its fully-qualified name and lists the fields to configure. Each field mapping specifies one or more constraint blocks.
+Each class mapping identifies a Java class by its fully-qualified name and lists the fields to configure. Each field mapping specifies one or more constraint entries.
 
 ---
 
@@ -228,205 +232,113 @@ Invalid payloads surface through `MessagePayloadValidationException`, which exte
 
 ---
 
-### `not-null`
+### Constraint Entries
 
-Ensures the field value is not `null`.
+Each `fields[].constraints[]` item uses the same envelope:
 
 | Property | Type | Description |
 |---|---|---|
-| `value` | `Boolean` | Enables the constraint if `true`. |
-| `message` | `String` | Custom error message. |
+| `constraintType` | `String` | Required. One of `NotNull`, `NotBlank`, `Min`, `Max`, `DecimalMin`, `DecimalMax`, `Size`, `Pattern`, or `Extensions`. |
+| `message` | `String` | Optional custom message for the entry. |
+| `params` | `Object` | Optional type-specific parameters. |
+
+#### `NotNull` and `NotBlank`
+
+Use the entry itself to enable the constraint; no `params` are required.
 
 ```yaml
-not-null:
-  value: true
+- constraintType: NotNull
   message: This field is required
-```
 
-**Merge rule:** OR semantics. If any source (annotation or config) says `true`, the constraint is enabled. Configuration cannot disable a baseline `@NotNull`.
-
----
-
-### `not-blank`
-
-Ensures a string field is not `null`, empty, or whitespace-only.
-
-| Property | Type | Description |
-|---|---|---|
-| `value` | `Boolean` | Enables the constraint if `true`. |
-| `message` | `String` | Custom error message. |
-
-```yaml
-not-blank:
-  value: true
+- constraintType: NotBlank
   message: Name must not be blank
 ```
 
-**Restriction:** Only valid on `CharSequence` (String) fields. Startup fails if applied to a non-string field.
+`NotBlank` only applies to `CharSequence` fields. Both use OR semantics: once the baseline or any config entry enables them, they stay enabled.
 
-**Merge rule:** OR semantics, same as `not-null`.
+#### `Min` and `Max`
 
----
-
-### `min`
-
-Applies an inclusive numeric lower bound.
-
-| Property | Type | Description |
-|---|---|---|
-| `value` | `Long` | Override value. |
-| `message` | `String` | Custom error message. |
+Use `params.value` for integer bounds:
 
 ```yaml
-min:
-  value: 21
+- constraintType: Min
+  params:
+    value: 21
   message: Must be at least 21
-```
 
-**Supported field types:** `Integer`, `Long`, `Short`, `Byte`, `BigDecimal`, `BigInteger`, `String`.
-
-**Merge rule:** The strictest (highest) lower bound wins across all sources (baseline annotation, `min.value`, `decimal-min.value`). All sources compete and the highest value is selected.
-
----
-
-### `max`
-
-Applies an inclusive numeric upper bound.
-
-| Property | Type | Description |
-|---|---|---|
-| `value` | `Long` | Override value. |
-| `message` | `String` | Custom error message. |
-
-```yaml
-max:
-  value: 55
+- constraintType: Max
+  params:
+    value: 55
   message: Must be at most 55
 ```
 
-**Merge rule:** The strictest (lowest) upper bound wins.
+`Min` and `DecimalMin` compete for the strictest lower bound. `Max` and `DecimalMax` compete for the strictest upper bound.
 
----
+#### `DecimalMin` and `DecimalMax`
 
-### `decimal-min`
-
-Applies a decimal lower bound with optional inclusivity control.
-
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `value` | `BigDecimal` | | Override value. |
-| `inclusive` | `Boolean` | `true` | Whether the bound is inclusive. Requires `value`. |
-| `message` | `String` | | Custom error message. |
+Use `params.value` plus optional `params.inclusive`:
 
 ```yaml
-decimal-min:
-  value: 1000.50
-  inclusive: false
+- constraintType: DecimalMin
+  params:
+    value: 1000.50
+    inclusive: false
   message: Salary must be greater than 1000.50
-```
 
-**Important:** Setting `inclusive` without a corresponding `value` makes that override invalid; the framework logs a warning and skips the affected mapping.
-
-**Merge rule:** Competes alongside `min` for the strictest lower bound. When two bounds have the same numeric value, exclusive is stricter than inclusive.
-
----
-
-### `decimal-max`
-
-Applies a decimal upper bound with optional inclusivity control.
-
-| Property | Type | Default | Description |
-|---|---|---|---|
-| `value` | `BigDecimal` | | Override value. |
-| `inclusive` | `Boolean` | `true` | Whether the bound is inclusive. Requires `value`. |
-| `message` | `String` | | Custom error message. |
-
-```yaml
-decimal-max:
-  value: 250000.00
-  inclusive: true
+- constraintType: DecimalMax
+  params:
+    value: 250000.00
   message: Salary must be at most 250000.00
 ```
 
-**Merge rule:** Competes alongside `max` for the strictest upper bound.
+Setting `inclusive` without `value` is invalid and causes that field mapping to be skipped with a warning.
 
----
+#### `Size`
 
-### `size`
-
-Constrains the size of a `String`, `Collection`, `Map`, or array.
-
-The `min` and `max` sub-properties each accept:
-
-| Property | Type | Description |
-|---|---|---|
-| `value` | `Long` | Override value. Must be >= 0 and <= `Integer.MAX_VALUE`. |
-| `message` | `String` | Custom error message. |
+Use `params.min` and/or `params.max`. For messages, either provide one shared top-level `message`, or use `params.minMessage` / `params.maxMessage` for split messages.
 
 ```yaml
-size:
-  min:
-    value: 5
-    message: Must have at least 5 characters
-  max:
-    value: 100
-    message: Must have at most 100 characters
+- constraintType: Size
+  params:
+    min: 5
+    minMessage: Must have at least 5 characters
+    max: 100
+    maxMessage: Must have at most 100 characters
 ```
 
-**Restriction:** Only valid on `String`, `Collection`, `Map`, and array fields.
+`Size` only applies to `String`, `Collection`, `Map`, and array fields. `min` uses higher-wins; `max` uses lower-wins.
 
-**Merge rule:** `size.min` uses higher-wins (stricter lower bound). `size.max` uses lower-wins (stricter upper bound).
+#### `Pattern`
 
-**Message behavior:** When `min` and `max` have different messages, the framework emits two separate `@Size` constraints so each side displays its own message.
-
----
-
-### `pattern`
-
-Validates a string against one or more regular expressions.
-
-| Property | Type | Description |
-|---|---|---|
-| `regexes` | `List<String>` | One or more regex patterns. All must match. |
-| `message` | `String` | Shared message for all regexes in this block. |
+Each `Pattern` entry represents exactly one regex. Use multiple entries when multiple regexes must all match.
 
 ```yaml
-pattern:
-  regexes:
-    - "^[A-Za-z ]+$"
-    - "^[A-Z].*"
+- constraintType: Pattern
+  params:
+    regexp: "^[A-Za-z ]+$"
   message: Invalid name format
+
+- constraintType: Pattern
+  params:
+    regexp: "^[A-Z].*"
+  message: Must start with an uppercase letter
 ```
 
-**Restriction:** Only valid on `CharSequence` (String) fields.
+Patterns are cumulative. Duplicate regex identities collapse into one effective rule, and a later configured message can replace the earlier one for that same regex identity.
 
-**Merge rule:** Patterns are cumulative. Distinct regexes are all enforced (AND semantics), but duplicate regex identities are collapsed into one effective rule. If configuration repeats a baseline-equivalent regex and provides a message, that message becomes the effective message for the single surviving rule.
+#### `Extensions`
 
----
-
-### `extensions`
-
-Validates entries in a `Map<String, Object>` field using JSONPath expressions and regular expressions.
-
-Each rule has:
-
-| Property | Type | Description |
-|---|---|---|
-| `json-path` | `String` | JSONPath expression to extract a value. Required. |
-| `regex` | `String` | Regex to match against the extracted value. Required. |
-| `message` | `String` | Custom error message. Optional. |
+Each `Extensions` entry represents one JSONPath/regex rule.
 
 ```yaml
-extensions:
-  rules:
-    - json-path: $.vendorExtensionCode
-      regex: "^[A-Z]{3}-[0-9]{4}$"
-      message: Vendor extension code format is invalid
+- constraintType: Extensions
+  params:
+    jsonPath: $.vendorExtensionCode
+    regexp: "^[A-Z]{3}-[0-9]{4}$"
+  message: Vendor extension code format is invalid
 ```
 
-**Restriction:** The field type must be `Map`, `Collection`, array, or `CharSequence`.
-
-See [Extensions Validation](#extensions-validation) for runtime behavior details.
+The field type must be `Map`, `Collection`, array, or `CharSequence`. See [Extensions Validation](#extensions-validation) for runtime behavior details.
 
 ---
 
@@ -438,14 +350,14 @@ The framework merges baseline constraints (from annotations) with configured con
 
 | Constraint Type | Merge Rule | Example |
 |---|---|---|
-| `not-null` / `not-blank` | OR -- any `true` wins | Baseline `@NotNull` + config `false` = still required |
-| `min` / `decimal-min` | Higher value wins | Baseline `@Min(18)` + config `min: 16` = 18 |
-| `max` / `decimal-max` | Lower value wins | Baseline `@Max(60)` + config `max: 70` = 60 |
-| `size.min` | Higher value wins | `@Size(min=3)` + config `5` = 5 |
-| `size.max` | Lower value wins | `@Size(max=30)` + config `25` = 25 |
+| `NotNull` / `NotBlank` | OR -- any enabled entry wins | Baseline `@NotNull` + config entry = still required |
+| `Min` / `DecimalMin` | Higher value wins | Baseline `@Min(18)` + config `value: 16` = 18 |
+| `Max` / `DecimalMax` | Lower value wins | Baseline `@Max(60)` + config `value: 70` = 60 |
+| `Size.params.min` | Higher value wins | `@Size(min=3)` + config `5` = 5 |
+| `Size.params.max` | Lower value wins | `@Size(max=30)` + config `25` = 25 |
 | Equal numeric bounds | Exclusive beats inclusive | Both at `10`: exclusive wins over inclusive |
-| `pattern` | Cumulative by identity (all distinct rules must match) | Baseline + config patterns both enforced; duplicate regex rules collapse |
-| `extensions` | Additive across contributors | Rules from all sources are combined |
+| `Pattern` | Cumulative by identity (all distinct rules must match) | Baseline + config patterns both enforced; duplicate regex rules collapse |
+| `Extensions` | Additive across contributors | Rules from all sources are combined |
 
 ### Walkthrough Example
 
@@ -462,16 +374,15 @@ private String name;
 And this YAML configuration:
 
 ```yaml
-- field-name: name
+- fieldName: name
   constraints:
-    size:
-      min:
-        value: 20
-      max:
-        value: 30
-    pattern:
-      regexes:
-        - "^[A-Za-z ]+$"
+    - constraintType: Size
+      params:
+        min: 20
+        max: 30
+    - constraintType: Pattern
+      params:
+        regexp: "^[A-Za-z ]+$"
 ```
 
 The merge produces:
@@ -490,7 +401,7 @@ The merge produces:
 
 ## Custom Messages
 
-Every constraint block accepts an optional `message` property that overrides the default Jakarta Validation message template.
+Every constraint entry accepts an optional `message` property that overrides the default Jakarta Validation message template.
 
 ### Rules
 
@@ -503,24 +414,23 @@ Every constraint block accepts an optional `message` property that overrides the
 Size constraints support independent messages for `min` and `max`:
 
 ```yaml
-size:
-  min:
-    value: 20
-    message: Name must have at least 20 characters
-  max:
-    value: 30
-    message: Name must have at most 30 characters
+- constraintType: Size
+  params:
+    min: 20
+    minMessage: Name must have at least 20 characters
+    max: 30
+    maxMessage: Name must have at most 30 characters
 ```
 
 When `min` and `max` have different messages, the framework emits two separate `@Size` constraints so each side displays its own message. When messages are the same (or both absent), a single `@Size` constraint covers both bounds.
 
 ### Pattern Messages
 
-The `message` in a `pattern` block is shared across all regexes in that block. Baseline patterns from `@Pattern` annotations keep their own default messages.
+Each `Pattern` entry has its own `message`. Baseline patterns from `@Pattern` annotations keep their own default messages.
 
 ### Extensions Messages
 
-Each extension rule has its own independent `message` property.
+Each `Extensions` entry has its own independent `message` property.
 
 ---
 
@@ -547,11 +457,11 @@ The `extensions` constraint validates entries in a `Map<String, Object>` field u
 ### Example: Single Value
 
 ```yaml
-extensions:
-  rules:
-    - json-path: $.vendorExtensionCode
-      regex: "^[A-Z]{3}-[0-9]{4}$"
-      message: Vendor extension code format is invalid
+- constraintType: Extensions
+  params:
+    jsonPath: $.vendorExtensionCode
+    regexp: "^[A-Z]{3}-[0-9]{4}$"
+  message: Vendor extension code format is invalid
 ```
 
 Validates that `extensions.get("vendorExtensionCode")` matches the pattern `ABC-1234`.
@@ -559,11 +469,11 @@ Validates that `extensions.get("vendorExtensionCode")` matches the pattern `ABC-
 ### Example: Multi-Value JSONPath
 
 ```yaml
-extensions:
-  rules:
-    - json-path: $.items[*].code
-      regex: "^[A-Z]{2}-\\d{3}$"
-      message: Item code format is invalid
+- constraintType: Extensions
+  params:
+    jsonPath: $.items[*].code
+    regexp: "^[A-Z]{2}-\\d{3}$"
+  message: Item code format is invalid
 ```
 
 Evaluates `$.items[*].code` against the extensions map, then validates each resolved code element against the regex.
@@ -573,12 +483,14 @@ Evaluates `$.items[*].code` against the extensions map, then validates each reso
 Multiple rules can be defined. Each generates an independent constraint, and all must pass:
 
 ```yaml
-extensions:
-  rules:
-    - json-path: $.vendorCode
-      regex: "^[A-Z]{3}$"
-    - json-path: $.regionId
-      regex: "^\\d{4}$"
+- constraintType: Extensions
+  params:
+    jsonPath: $.vendorCode
+    regexp: "^[A-Z]{3}$"
+- constraintType: Extensions
+  params:
+    jsonPath: $.regionId
+    regexp: "^\\d{4}$"
 ```
 
 ---
@@ -604,7 +516,7 @@ Each contributor is invoked for every resolved field. It returns `Optional.empty
 
 ### Built-in Contributor
 
-`PropertiesFieldConstraintContributor` adapts `com.ampp.business-validation-override` properties into the contributor interface. It is registered at `@Order(0)`.
+`PropertiesValidationOverrideContributor` adapts `com.ampp.businessValidationOverride` properties into the contributor interface. It is registered at `@Order(0)`.
 
 ### Writing a Custom Contributor
 
@@ -646,9 +558,10 @@ Spring validates `ValidationProperties` on binding:
 
 | Error | Cause |
 |---|---|
-| `full-class-name` is blank | Missing or empty class name |
+| `fullClassName` is blank | Missing or empty class name |
 | `fields` list is empty | No fields configured for a class |
-| `field-name` is blank | Missing or empty field name |
+| `fieldName` is blank | Missing or empty field name |
+| `constraintType` is blank | Missing or empty constraint entry type |
 
 ### Metadata Resolution Warnings
 
@@ -674,10 +587,10 @@ Duplicate or malformed contributor entries are also skipped with warnings:
 
 | Error Message Pattern | Cause |
 |---|---|
-| `Constraint notBlank is not supported for...fieldType=java.lang.Integer` | `not-blank` on a non-String field |
-| `Constraint numeric bounds is not supported for...` | Numeric constraint on an unsupported type (e.g., `Boolean`, `Double`) |
-| `Constraint size is not supported for...` | `size` on a non-container field |
-| `Constraint pattern is not supported for...` | `pattern` on a non-String field |
+| `Constraint notBlank is not supported for...fieldType=java.lang.Integer` | `NotBlank` on a non-String field |
+| `Constraint numeric bounds is not supported for...` | `Min` / `Max` / `DecimalMin` / `DecimalMax` on an unsupported type (e.g., `Boolean`, `Double`) |
+| `Constraint size is not supported for...` | `Size` on a non-container field |
+| `Constraint pattern is not supported for...` | `Pattern` on a non-String field |
 
 ### Merge-Time Warnings
 
@@ -696,10 +609,11 @@ Duplicate or malformed contributor entries are also skipped with warnings:
 ```yaml
 # This mapping is skipped with a warning:
 # baseline @Min(18) stays at 18, config max is 10 -> 18 > 10
-- field-name: age
+- fieldName: age
   constraints:
-    max:
-      value: 10
+    - constraintType: Max
+      params:
+        value: 10
 ```
 
 Warning: `Invalid numeric constraints. effectiveMin > effectiveMax for class=..., field=age, effectiveMin=18 (inclusive=true), effectiveMax=10 (inclusive=true)`
@@ -717,9 +631,9 @@ application.yml                Java annotations
 ValidationProperties    GeneratedClassMetadataCache
       |                     (extracts baseline)
       v                              |
-PropertiesField-            ResolvedClassMapping
-ConstraintContributor           + baseline
-      |                              |
+PropertiesValidationOverrideContributor
+      |                         ResolvedClassMapping
+      |                            + baseline
       +------> ConstraintMergeService <------+
               (strictest-wins merge)
                        |
@@ -741,7 +655,7 @@ ConstraintContributor           + baseline
 | `ValidationProperties` | Spring `@ConfigurationProperties` model for YAML config |
 | `GeneratedClassMetadataCache` | Resolves classes/fields, extracts baseline annotations, validates compatibility |
 | `FieldConstraintContributor` | SPI for pluggable constraint sources |
-| `PropertiesFieldConstraintContributor` | Built-in contributor backed by YAML properties |
+| `PropertiesValidationOverrideContributor` | Built-in contributor backed by `com.ampp.businessValidationOverride` properties |
 | `ConstraintMergeService` | Merges baseline + all contributed constraints using strictness rules |
 | `ConfigDrivenConstraintMappingContributor` | Translates merged constraints into Hibernate Validator programmatic mappings |
 | `ValidationAutoConfiguration` | Spring Boot auto-configuration that wires all beans |
@@ -763,16 +677,16 @@ For a detailed walkthrough of the internal pipeline, see [validation-constraint-
 ## Troubleshooting
 
 **My override seems to have no effect.**
-The merge algorithm always selects the stricter value. If your configured value is less strict than the annotation baseline (e.g., config `min: 10` but annotation says `@Min(18)`), the baseline wins.
+The merge algorithm always selects the stricter value. If your configured value is less strict than the annotation baseline (for example a `Min` entry with `params.value: 10` while the annotation is `@Min(18)`), the baseline wins.
 
 **I see "Configured class was not found."**
-Ensure `full-class-name` is the fully-qualified class name (e.g., `com.example.MyForm`, not `MyForm`) and the class is on the classpath. The invalid mapping is skipped; other valid mappings continue to load.
+Ensure `fullClassName` is the fully-qualified class name (e.g., `com.example.MyForm`, not `MyForm`) and the class is on the classpath. The invalid mapping is skipped; other valid mappings continue to load.
 
 **I see "Configured field was not found."**
-The `field-name` must match the Java field name exactly (case-sensitive). It must be a declared field on the class (or a superclass), not a method-only property. The invalid mapping is skipped and does not block startup or refresh.
+The `fieldName` must match the Java field name exactly (case-sensitive). It must be a declared field on the class (or a superclass), not a method-only property. The invalid mapping is skipped and does not block startup or refresh.
 
 **I get "Constraint notBlank is not supported for field type Integer."**
-`not-blank` only works on `CharSequence` (String) fields. Remove the `not-blank` constraint from the numeric field configuration.
+`NotBlank` only works on `CharSequence` (String) fields. Remove the `NotBlank` entry from the numeric field configuration.
 
 **How do I make a field accept null when it is annotated with `@NotNull`?**
 You cannot. The framework uses OR semantics for boolean constraints: if any source (annotation or config) says `true`, the constraint is enabled. This is by design to prevent accidental weakening of validation rules.
@@ -780,14 +694,14 @@ You cannot. The framework uses OR semantics for boolean constraints: if any sour
 **Can I configure validation for fields that have no annotations?**
 Yes. The field just needs to exist on the class. You can add any supported constraint purely from YAML, and the merge will treat the baseline as empty.
 
-**What happens if I set both `min` and `decimal-min` for the same field?**
-Both sources compete. The framework compares all candidates (baseline annotation, `min.value`, `decimal-min.value`) and selects the strictest lower bound.
+**What happens if I set both `Min` and `DecimalMin` for the same field?**
+Both sources compete. The framework compares all candidates (baseline annotation, `Min.params.value`, `DecimalMin.params.value`) and selects the strictest lower bound.
 
-**Does the pattern `message` apply per-regex or to the whole block?**
-It applies to the whole configured block. All configured regexes in one `pattern` block share the same message. Baseline patterns from annotations keep their own default Jakarta messages.
+**Does the `Pattern` message apply per-regex or to the whole block?**
+Each `Pattern` entry carries its own message. If you want different messages for different regexes, add multiple `Pattern` entries.
 
 **Can I use Spring profiles to vary validation overrides per environment?**
 Yes. Use standard Spring Boot profile-specific configuration files (e.g., `application-prod.yml`, `application-staging.yml`). The framework reads from whatever configuration source Spring resolves at runtime.
 
 **I see two `@Size` violation messages for the same field.**
-This happens when `size.min.message` and `size.max.message` are different. The framework emits two separate `@Size` constraints so each bound displays its own message. If you want a single message, set the same `message` on both `min` and `max` (or set it on only one and leave the other unset).
+This happens when `Size.params.minMessage` and `Size.params.maxMessage` are different. The framework emits two separate `@Size` constraints so each bound displays its own message. If you want a single message, use the top-level `message` on the `Size` entry or set the same `minMessage` and `maxMessage`.

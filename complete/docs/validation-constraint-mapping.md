@@ -9,7 +9,7 @@ This document explains how the config-driven validation pipeline works in this p
 The goal of the pipeline is to take:
 
 1. validation annotations already present on the Java model
-2. extra constraints contributed by `FieldConstraintContributor` beans (including the built-in properties contributor for `com.ampp.business-validation-override.*`)
+2. extra constraints contributed by `FieldConstraintContributor` beans (including the built-in properties contributor for `com.ampp.businessValidationOverride.*`)
 
 and turn them into one final set of Hibernate Validator rules that the application uses at runtime.
 
@@ -46,51 +46,51 @@ Represents what was already declared in code with annotations like:
 
 These values come from `GeneratedClassMetadataCache`.
 
-### `ValidationProperties.Constraints`
+### `ValidationProperties`
 
-Represents what came from `application.yml` or other Spring config sources.
+Represents what came from `application.yml` or other Spring config sources. The public config shape is now a list of constraint entries, and the contributor translates those entries into the internal typed model used by merge/runtime code.
 
 Examples:
 
 ```yaml
 com:
   ampp:
-    business-validation-override:
-      - full-class-name: com.example.validatingforminput.PersonForm
+    businessValidationOverride:
+      - fullClassName: com.example.validatingforminput.PersonForm
         fields:
-          - field-name: name
+          - fieldName: name
             constraints:
-              not-blank:
-                value: true
+              - constraintType: NotBlank
                 message: Name is required
-              size:
-                min:
-                  value: 4
-                  message: Name must have at least 4 characters
-                max:
-                  value: 40
-                  message: Name must have at most 40 characters
-              pattern:
-                regexes:
-                  - ^[A-Za-z]+$
+              - constraintType: Size
+                params:
+                  min: 4
+                  minMessage: Name must have at least 4 characters
+                  max: 40
+                  maxMessage: Name must have at most 40 characters
+              - constraintType: Pattern
+                params:
+                  regexp: ^[A-Za-z]+$
                 message: Name must contain only letters
-          - field-name: age
+          - fieldName: age
             constraints:
-              decimal-min:
-                value: 25.5
-                inclusive: false
+              - constraintType: DecimalMin
+                params:
+                  value: 25.5
+                  inclusive: false
                 message: Age must be greater than 25.5
-              decimal-max:
-                value: 58.5
-                inclusive: false
+              - constraintType: DecimalMax
+                params:
+                  value: 58.5
+                  inclusive: false
                 message: Age must be lower than 58.5
-          - field-name: extensions
+          - fieldName: extensions
             constraints:
-              extensions:
-                rules:
-                  - json-path: $.vendorExtensionCode
-                    regex: ^[A-Z]{3}-[0-9]{4}$
-                    message: Vendor extension code is invalid
+              - constraintType: Extensions
+                params:
+                  jsonPath: $.vendorExtensionCode
+                  regexp: ^[A-Z]{3}-[0-9]{4}$
+                message: Vendor extension code is invalid
 ```
 
 ### `FieldConstraintContributor`
@@ -107,11 +107,11 @@ Optional<ValidationProperties.Constraints> contribute(
 All contributors are evaluated for every resolved field in Spring order:
 
 - lower `@Order` runs first
-- the built-in `PropertiesFieldConstraintContributor` runs at `@Order(0)`
+- the built-in `PropertiesValidationOverrideContributor` runs at `@Order(0)`
 - exact strictness ties keep the first winner
 - patterns and extensions are additive in contributor order
 
-The built-in `PropertiesFieldConstraintContributor` adapts `com.ampp.business-validation-override.*` into this interface.
+The built-in `PropertiesValidationOverrideContributor` adapts `com.ampp.businessValidationOverride.*` into this interface.
 If a custom contributor should beat properties on an exact tie, it must use an order lower than `0`.
 
 ### `EffectiveFieldConstraints`
@@ -485,7 +485,7 @@ That means the config can make a field stricter, but not weaker.
 Example:
 
 - baseline has `@NotNull`
-- config says `not-null.value=false`
+- config adds a `NotNull` entry with no message
 
 Result: still true, because baseline already required it.
 
@@ -592,19 +592,18 @@ The merge service rejects these immediately.
 List<PatternRule> patterns = new ArrayList<>(baseline.patterns());
 appendConfiguredPatterns(
 	patterns,
-	effectiveConfig.getPattern().getRegexes(),
-	effectiveConfig.getPattern().getMessage(),
+	effectiveConfig.getPattern().getRules(),
 	className,
 	fieldName);
 ```
 
 Patterns are not replaced.
 
-The baseline pattern list is copied first, then configured regexes are appended.
+The baseline pattern list is copied first, then configured pattern entries are appended.
 
 That means configured patterns make the field stricter by adding more rules.
 
-### Configured regexes are validated
+### Configured pattern entries are validated
 
 `appendConfiguredPatterns(...)` does three things before adding a regex:
 
@@ -662,19 +661,18 @@ And config adds:
 ```yaml
 com:
   ampp:
-    business-validation-override:
-      - full-class-name: com.example.validatingforminput.PersonForm
+    businessValidationOverride:
+      - fullClassName: com.example.validatingforminput.PersonForm
         fields:
-          - field-name: name
+          - fieldName: name
             constraints:
-              size:
-                min:
-                  value: 4
-                max:
-                  value: 40
-              pattern:
-                regexes:
-                  - ^[A-Za-z]+$
+              - constraintType: Size
+                params:
+                  min: 4
+                  max: 40
+              - constraintType: Pattern
+                params:
+                  regexp: ^[A-Za-z]+$
 ```
 
 ### Baseline extracted from annotations

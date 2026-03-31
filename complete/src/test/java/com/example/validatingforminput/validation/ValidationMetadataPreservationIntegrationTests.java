@@ -36,19 +36,20 @@ import jakarta.validation.constraints.Pattern;
 @SpringBootTest(
 	classes = ValidatingFormInputApplication.class,
 	properties = {
-		"com.ampp.business-validation-override[0].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$EmailTarget",
-		"com.ampp.business-validation-override[0].fields[0].field-name=email",
-		"com.ampp.business-validation-override[0].fields[0].constraints.not-null.value=true",
-		"com.ampp.business-validation-override[1].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CascadeTarget",
-		"com.ampp.business-validation-override[1].fields[0].field-name=contact",
-		"com.ampp.business-validation-override[1].fields[0].constraints.not-null.value=true",
-		"com.ampp.business-validation-override[2].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$PatternTarget",
-		"com.ampp.business-validation-override[2].fields[0].field-name=name",
-		"com.ampp.business-validation-override[2].fields[0].constraints.pattern.regexes[0]=^[A-Za-z ]+$",
-		"com.ampp.business-validation-override[2].fields[0].constraints.pattern.message=Configured letters only",
-		"com.ampp.business-validation-override[3].full-class-name=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CustomAttributeTarget",
-		"com.ampp.business-validation-override[3].fields[0].field-name=code",
-		"com.ampp.business-validation-override[3].fields[0].constraints.not-null.value=true"
+		"com.ampp.businessValidationOverride[0].fullClassName=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$EmailTarget",
+		"com.ampp.businessValidationOverride[0].fields[0].fieldName=email",
+		"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=NotNull",
+		"com.ampp.businessValidationOverride[1].fullClassName=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CascadeTarget",
+		"com.ampp.businessValidationOverride[1].fields[0].fieldName=contact",
+		"com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=NotNull",
+		"com.ampp.businessValidationOverride[2].fullClassName=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$PatternTarget",
+		"com.ampp.businessValidationOverride[2].fields[0].fieldName=name",
+		"com.ampp.businessValidationOverride[2].fields[0].constraints[0].constraintType=Pattern",
+		"com.ampp.businessValidationOverride[2].fields[0].constraints[0].params.regexp=^[A-Za-z ]+$",
+		"com.ampp.businessValidationOverride[2].fields[0].constraints[0].message=Configured letters only",
+		"com.ampp.businessValidationOverride[3].fullClassName=com.example.validation.core.internal.ValidationMetadataPreservationIntegrationTests$CustomAttributeTarget",
+		"com.ampp.businessValidationOverride[3].fields[0].fieldName=code",
+		"com.ampp.businessValidationOverride[3].fields[0].constraints[0].constraintType=NotNull"
 	})
 class ValidationMetadataPreservationIntegrationTests {
 

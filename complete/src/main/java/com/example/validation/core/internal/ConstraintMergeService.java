@@ -107,8 +107,7 @@ public class ConstraintMergeService {
 		for (ConstraintOverrideSet configuredConstraint : configuredConstraints) {
 			appendConfiguredPatterns(
 				patterns,
-				configuredConstraint.getPattern().getRegexes(),
-				configuredConstraint.getPattern().getMessage(),
+				configuredConstraint.getPattern().getRules(),
 				className,
 				fieldName);
 			extensionRules.addAll(
@@ -308,16 +307,14 @@ public class ConstraintMergeService {
 
 	private void appendConfiguredPatterns(
 		List<PatternRule> patterns,
-		List<String> configuredRegexes,
-		String configuredMessage,
+		List<ConstraintOverrideSet.PatternRuleConfig> configuredRules,
 		String className,
 		String fieldName
 	) {
 		Map<PatternIdentity, Integer> patternIndexes = indexPatterns(patterns);
-		for (int index = 0; index < configuredRegexes.size(); index++) {
+		for (int index = 0; index < configuredRules.size(); index++) {
 			PatternRule configuredPattern = toConfiguredPatternRule(
-				configuredRegexes.get(index),
-				configuredMessage,
+				configuredRules.get(index),
 				className,
 				fieldName,
 				index);
@@ -336,17 +333,20 @@ public class ConstraintMergeService {
 	}
 
 	private PatternRule toConfiguredPatternRule(
-		String configuredRegex,
-		String configuredMessage,
+		ConstraintOverrideSet.PatternRuleConfig configuredRule,
 		String className,
 		String fieldName,
 		int index
 	) {
+		if (configuredRule == null) {
+			throw invalid("pattern.rules[" + index + "] must not be null", className, fieldName);
+		}
+		String configuredRegex = configuredRule.getRegex();
 		if (configuredRegex == null || configuredRegex.isBlank()) {
 			throw invalid("regex must be non-empty", className, fieldName);
 		}
 		validateRegex("pattern", configuredRegex, className, fieldName);
-		return new PatternRule(configuredRegex.trim(), configuredMessage);
+		return new PatternRule(configuredRegex.trim(), configuredRule.getMessage());
 	}
 
 	private List<JsonPathRegexRule> toConfiguredExtensionRules(

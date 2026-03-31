@@ -1,8 +1,6 @@
 package com.example.validation.core.internal;
 
-import com.example.validation.core.spi.ClassValidationOverride;
 import com.example.validation.core.spi.ConstraintOverrideSet;
-import com.example.validation.core.spi.FieldValidationOverride;
 
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -82,26 +80,6 @@ public class ValidationProperties {
 
     public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
         this.businessValidationOverride = copyList(businessValidationOverride);
-    }
-
-    public List<ClassValidationOverride> toValidationOverrides() {
-        List<ClassValidationOverride> overrides = new ArrayList<>();
-        for (ClassMapping classMapping : businessValidationOverride) {
-            if (classMapping == null) {
-                continue;
-            }
-            List<FieldValidationOverride> fieldOverrides = new ArrayList<>();
-            for (FieldMapping fieldMapping : classMapping.getFields()) {
-                if (fieldMapping == null) {
-                    continue;
-                }
-                fieldOverrides.add(new FieldValidationOverride(
-                    fieldMapping.getFieldName(),
-                    toConstraintOverrideSet(fieldMapping.getConstraints())));
-            }
-            overrides.add(new ClassValidationOverride(classMapping.getFullClassName(), fieldOverrides));
-        }
-        return List.copyOf(overrides);
     }
 
     static ConstraintOverrideSet toConstraintOverrideSet(Constraints constraints) {
@@ -261,7 +239,7 @@ public class ValidationProperties {
         private String fieldName;
 
         @Valid
-        private Constraints constraints = new Constraints();
+        private List<@NotNull @Valid ConstraintMapping> constraints = new ArrayList<>();
 
         public String getFieldName() {
             return fieldName;
@@ -271,12 +249,130 @@ public class ValidationProperties {
             this.fieldName = trimToNull(fieldName);
         }
 
-        public Constraints getConstraints() {
+        public List<ConstraintMapping> getConstraints() {
             return constraints;
         }
 
-        public void setConstraints(Constraints constraints) {
-            this.constraints = defaultValue(constraints, Constraints::new);
+        public void setConstraints(List<ConstraintMapping> constraints) {
+            this.constraints = copyList(constraints);
+        }
+    }
+
+    public static class ConstraintMapping {
+
+        @NotBlank
+        private String constraintType;
+
+        private String message;
+
+        @Valid
+        private ConstraintParameters params = new ConstraintParameters();
+
+        public String getConstraintType() {
+            return constraintType;
+        }
+
+        public void setConstraintType(String constraintType) {
+            this.constraintType = trimToNull(constraintType);
+        }
+
+        public String getMessage() {
+            return message;
+        }
+
+        public void setMessage(String message) {
+            this.message = trimToNull(message);
+        }
+
+        public ConstraintParameters getParams() {
+            return params;
+        }
+
+        public void setParams(ConstraintParameters params) {
+            this.params = defaultValue(params, ConstraintParameters::new);
+        }
+    }
+
+    public static class ConstraintParameters {
+
+        private BigDecimal value;
+
+        private Boolean inclusive;
+
+        private Long min;
+
+        private Long max;
+
+        private String regexp;
+
+        private String jsonPath;
+
+        private String minMessage;
+
+        private String maxMessage;
+
+        public BigDecimal getValue() {
+            return value;
+        }
+
+        public void setValue(BigDecimal value) {
+            this.value = value;
+        }
+
+        public Boolean getInclusive() {
+            return inclusive;
+        }
+
+        public void setInclusive(Boolean inclusive) {
+            this.inclusive = inclusive;
+        }
+
+        public Long getMin() {
+            return min;
+        }
+
+        public void setMin(Long min) {
+            this.min = min;
+        }
+
+        public Long getMax() {
+            return max;
+        }
+
+        public void setMax(Long max) {
+            this.max = max;
+        }
+
+        public String getRegexp() {
+            return regexp;
+        }
+
+        public void setRegexp(String regexp) {
+            this.regexp = trimToNull(regexp);
+        }
+
+        public String getJsonPath() {
+            return jsonPath;
+        }
+
+        public void setJsonPath(String jsonPath) {
+            this.jsonPath = trimToNull(jsonPath);
+        }
+
+        public String getMinMessage() {
+            return minMessage;
+        }
+
+        public void setMinMessage(String minMessage) {
+            this.minMessage = trimToNull(minMessage);
+        }
+
+        public String getMaxMessage() {
+            return maxMessage;
+        }
+
+        public void setMaxMessage(String maxMessage) {
+            this.maxMessage = trimToNull(maxMessage);
         }
     }
 

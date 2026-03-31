@@ -19,9 +19,10 @@ import jakarta.validation.constraints.Size;
 @SpringBootTest(
     classes = ValidatingFormInputApplication.class,
     properties = {
-        "com.ampp.business-validation-override[0].full-class-name=com.example.validation.core.internal.ExternalPayloadValidatorIntegrationTests$PayloadTarget",
-        "com.ampp.business-validation-override[0].fields[0].field-name=name",
-        "com.ampp.business-validation-override[0].fields[0].constraints.size.min.value=5"
+        "com.ampp.businessValidationOverride[0].fullClassName=com.example.validation.core.internal.ExternalPayloadValidatorIntegrationTests$PayloadTarget",
+        "com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
+        "com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Size",
+        "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.min=5"
     }
 )
 class ExternalPayloadValidatorIntegrationTests {

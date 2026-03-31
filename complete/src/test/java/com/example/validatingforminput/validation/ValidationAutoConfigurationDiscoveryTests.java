@@ -116,14 +116,50 @@ class ValidationAutoConfigurationDiscoveryTests {
 				.properties(
 					"spring.config.name=validation-auto-config-test",
 					"com.ampp.request-validation-bypass.enabled=true",
-					"com.ampp.business-validation-override[0].full-class-name=",
-					"com.ampp.business-validation-override[0].fields[0].field-name=name",
-					"com.ampp.business-validation-override[0].fields[0].constraints.not-null.value=true")
+					"com.ampp.businessValidationOverride[0].fullClassName=",
+					"com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
+					"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=NotNull")
 				.run()) {
 				assertThat(context).isNotNull();
 			}
 		})
 			.hasStackTraceContaining("businessValidationOverride[0].fullClassName")
+			.hasStackTraceContaining("must not be blank");
+	}
+
+	@Test
+	void shouldRejectBlankConfiguredFieldName() {
+		assertThatThrownBy(() -> {
+			try (ConfigurableApplicationContext context = new SpringApplicationBuilder(TestApplication.class)
+				.web(WebApplicationType.NONE)
+				.properties(
+					"spring.config.name=validation-auto-config-test",
+					"com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm",
+					"com.ampp.businessValidationOverride[0].fields[0].fieldName=",
+					"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=NotNull")
+				.run()) {
+				assertThat(context).isNotNull();
+			}
+		})
+			.hasStackTraceContaining("businessValidationOverride[0].fields[0].fieldName")
+			.hasStackTraceContaining("must not be blank");
+	}
+
+	@Test
+	void shouldRejectBlankConfiguredConstraintType() {
+		assertThatThrownBy(() -> {
+			try (ConfigurableApplicationContext context = new SpringApplicationBuilder(TestApplication.class)
+				.web(WebApplicationType.NONE)
+				.properties(
+					"spring.config.name=validation-auto-config-test",
+					"com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.PersonForm",
+					"com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
+					"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=")
+				.run()) {
+				assertThat(context).isNotNull();
+			}
+		})
+			.hasStackTraceContaining("businessValidationOverride[0].fields[0].constraints[0].constraintType")
 			.hasStackTraceContaining("must not be blank");
 	}
 

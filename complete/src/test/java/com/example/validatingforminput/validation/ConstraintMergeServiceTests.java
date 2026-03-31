@@ -250,6 +250,25 @@ class ConstraintMergeServiceTests {
 	}
 
 	@Test
+	void shouldKeepIndependentMessagesForConfiguredPatternRules() {
+		BaselineFieldConstraints baseline = BaselineFieldConstraints.empty();
+		ConstraintOverrideSet constraints = new ConstraintOverrideSet();
+		ConstraintOverrideSet.PatternRuleConfig first = new ConstraintOverrideSet.PatternRuleConfig();
+		first.setRegex("^[A-Za-z]+$");
+		first.setMessage("Letters only");
+		ConstraintOverrideSet.PatternRuleConfig second = new ConstraintOverrideSet.PatternRuleConfig();
+		second.setRegex("^[A-Z].*$");
+		second.setMessage("Must start uppercase");
+		constraints.getPattern().setRules(List.of(first, second));
+
+		EffectiveFieldConstraints effective = mergeService.merge(baseline, constraints, "AnyClass", "name");
+
+		assertThat(effective.patterns())
+			.extracting(PatternRule::message)
+			.containsExactly("Letters only", "Must start uppercase");
+	}
+
+	@Test
 	void shouldDeduplicateConfiguredPatternThatMatchesBaselineIdentity() {
 		BaselineFieldConstraints baseline = new BaselineFieldConstraints(
 			false,
