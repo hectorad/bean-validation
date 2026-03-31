@@ -20,7 +20,7 @@ class ConfigDrivenConstraintMappingContributorTests {
 
 	@Test
 	void shouldWarnAndSkipInvalidConstraintMappings(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 

@@ -7,6 +7,7 @@ import com.example.validation.core.internal.ConstraintMergeService;
 import com.example.validation.core.internal.GeneratedClassMetadataCache;
 import com.example.validation.core.internal.PropertiesValidationOverrideContributor;
 import com.example.validation.core.internal.RequestAwareValidatingLocalValidatorFactoryBean;
+import com.example.validation.core.internal.BusinessValidationOverrideProperties;
 import com.example.validation.core.internal.ValidationProperties;
 import com.example.validation.core.internal.ValidationOverrideRegistry;
 import com.example.validation.core.internal.ValidationTroubleshootingAnalyzer;
@@ -25,6 +26,7 @@ import org.springframework.boot.validation.MessageInterpolatorFactory;
 import org.springframework.cloud.context.config.annotation.RefreshScope;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
@@ -54,115 +56,116 @@ public class ValidationAutoConfiguration {
         }
         return configureDefaultValidator(applicationContext, customizers, validationProperties);
     }
-
-    @Bean
-    @ConditionalOnMissingBean
+    @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    public ConstraintMergeService constraintMergeService() {
-        return new ConstraintMergeService();
-    }
+    @EnableConfigurationProperties(BusinessValidationOverrideProperties.class)
+    static class ValidationOverridePropertiesConfiguration {
 
-    @Bean
-    @ConditionalOnMissingBean(name = "propertiesValidationOverrideContributor")
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    @RefreshScope
-    public ValidationOverrideContributor propertiesValidationOverrideContributor(ValidationProperties validationProperties) {
-        return new PropertiesValidationOverrideContributor(validationProperties);
-    }
+        @Bean
+        @ConditionalOnMissingBean
+        ConstraintMergeService constraintMergeService() {
+            return new ConstraintMergeService();
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    @RefreshScope
-    public ValidationOverrideRegistry validationOverrideRegistry(
-            ValidationProperties validationProperties,
-            ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
-    ) {
-        return new ValidationOverrideRegistry(
-                defaultValidationOverrideContributors(validationProperties, validationOverrideContributors));
-    }
+        @Bean
+        @ConditionalOnMissingBean(name = "propertiesValidationOverrideContributor")
+        @RefreshScope
+        ValidationOverrideContributor propertiesValidationOverrideContributor(
+                BusinessValidationOverrideProperties businessValidationOverrideProperties
+        ) {
+            return new PropertiesValidationOverrideContributor(businessValidationOverrideProperties);
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    @RefreshScope
-    public GeneratedClassMetadataCache generatedClassMetadataCache(
-            ValidationOverrideRegistry validationOverrideRegistry
-    ) {
-        return new GeneratedClassMetadataCache(validationOverrideRegistry);
-    }
+        @Bean
+        @ConditionalOnMissingBean
+        @RefreshScope
+        ValidationOverrideRegistry validationOverrideRegistry(
+                BusinessValidationOverrideProperties businessValidationOverrideProperties,
+                ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
+        ) {
+            return new ValidationOverrideRegistry(
+                    defaultValidationOverrideContributors(businessValidationOverrideProperties, validationOverrideContributors));
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    @RefreshScope
-    public ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
-            ValidationOverrideRegistry validationOverrideRegistry,
-            GeneratedClassMetadataCache generatedClassMetadataCache,
-            ConstraintMergeService constraintMergeService
-    ) {
-        return new ConfigDrivenConstraintMappingContributor(
-                validationOverrideRegistry,
-                generatedClassMetadataCache,
-                constraintMergeService);
-    }
+        @Bean
+        @ConditionalOnMissingBean
+        @RefreshScope
+        GeneratedClassMetadataCache generatedClassMetadataCache(
+                ValidationOverrideRegistry validationOverrideRegistry
+        ) {
+            return new GeneratedClassMetadataCache(validationOverrideRegistry);
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
-    public ValidationTroubleshootingAnalyzer validationTroubleshootingAnalyzer(
-            ValidationOverrideRegistry validationOverrideRegistry,
-            GeneratedClassMetadataCache generatedClassMetadataCache,
-            ConstraintMergeService constraintMergeService
-    ) {
-        return new ValidationTroubleshootingAnalyzer(
-                validationOverrideRegistry,
-                generatedClassMetadataCache,
-                constraintMergeService);
-    }
+        @Bean
+        @ConditionalOnMissingBean
+        @RefreshScope
+        ConfigDrivenConstraintMappingContributor configDrivenConstraintMappingContributor(
+                ValidationOverrideRegistry validationOverrideRegistry,
+                GeneratedClassMetadataCache generatedClassMetadataCache,
+                ConstraintMergeService constraintMergeService
+        ) {
+            return new ConfigDrivenConstraintMappingContributor(
+                    validationOverrideRegistry,
+                    generatedClassMetadataCache,
+                    constraintMergeService);
+        }
 
-    @Bean
-    @ConditionalOnMissingBean
-    public ExternalPayloadValidator externalPayloadValidator(Validator validator) {
-        return new BeanValidationExternalPayloadValidator(validator);
-    }
+        @Bean
+        @ConditionalOnMissingBean
+        ValidationTroubleshootingAnalyzer validationTroubleshootingAnalyzer(
+                ValidationOverrideRegistry validationOverrideRegistry,
+                GeneratedClassMetadataCache generatedClassMetadataCache,
+                ConstraintMergeService constraintMergeService
+        ) {
+            return new ValidationTroubleshootingAnalyzer(
+                    validationOverrideRegistry,
+                    generatedClassMetadataCache,
+                    constraintMergeService);
+        }
 
-    @Bean
-    public ValidationConfigurationCustomizer configDrivenValidationConfigurationCustomizer(
-            ValidationProperties validationProperties,
-            ObjectProvider<ConfigDrivenConstraintMappingContributor> contributorProvider,
-            ObjectProvider<ValidationOverrideRegistry> validationOverrideRegistryProvider,
-            ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
-            ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
-            ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
-    ) {
-        java.util.concurrent.atomic.AtomicBoolean warnedUnsupportedProvider = new java.util.concurrent.atomic.AtomicBoolean();
-        return configuration -> {
-            if (!validationProperties.isValidationEnabled()) {
-                return;
-            }
-            if (!(configuration instanceof HibernateValidatorConfiguration hibernateConfiguration)) {
-                if (warnedUnsupportedProvider.compareAndSet(false, true)) {
-                    log.warn(
-                            "Skipping config-driven constraint mapping because the active Bean Validation provider is not Hibernate Validator: {}",
-                            configuration.getClass().getName());
+        @Bean
+        ValidationConfigurationCustomizer configDrivenValidationConfigurationCustomizer(
+                BusinessValidationOverrideProperties businessValidationOverrideProperties,
+                ObjectProvider<ConfigDrivenConstraintMappingContributor> contributorProvider,
+                ObjectProvider<ValidationOverrideRegistry> validationOverrideRegistryProvider,
+                ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
+                ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
+                ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
+        ) {
+            java.util.concurrent.atomic.AtomicBoolean warnedUnsupportedProvider = new java.util.concurrent.atomic.AtomicBoolean();
+            return configuration -> {
+                if (!(configuration instanceof HibernateValidatorConfiguration hibernateConfiguration)) {
+                    if (warnedUnsupportedProvider.compareAndSet(false, true)) {
+                        log.warn(
+                                "Skipping config-driven constraint mapping because the active Bean Validation provider is not Hibernate Validator: {}",
+                                configuration.getClass().getName());
+                    }
+                    return;
                 }
-                return;
-            }
-            ConfigDrivenConstraintMappingContributor contributor = contributorProvider
-                    .getIfAvailable(() -> runtimeConstraintMappingContributor(
-                            validationProperties,
-                            validationOverrideRegistryProvider,
-                            generatedClassMetadataCacheProvider,
-                            constraintMergeServiceProvider,
-                            validationOverrideContributors));
-            contributor.createConstraintMappings(() -> {
-                var mapping = hibernateConfiguration.createConstraintMapping();
-                hibernateConfiguration.addMapping(mapping);
-                return mapping;
-            });
-        };
+                ConfigDrivenConstraintMappingContributor contributor = contributorProvider
+                        .getIfAvailable(() -> runtimeConstraintMappingContributor(
+                                businessValidationOverrideProperties,
+                                validationOverrideRegistryProvider,
+                                generatedClassMetadataCacheProvider,
+                                constraintMergeServiceProvider,
+                                validationOverrideContributors));
+                contributor.createConstraintMappings(() -> {
+                    var mapping = hibernateConfiguration.createConstraintMapping();
+                    hibernateConfiguration.addMapping(mapping);
+                    return mapping;
+                });
+            };
+        }
+        @Bean
+        @ConditionalOnMissingBean
+        public ExternalPayloadValidator externalPayloadValidator(Validator validator) {
+            return new BeanValidationExternalPayloadValidator(validator);
+        }
     }
+
+
+
+
 
     private static RequestAwareValidatingLocalValidatorFactoryBean configureDefaultValidator(
             ApplicationContext applicationContext,
@@ -178,7 +181,7 @@ public class ValidationAutoConfiguration {
     }
 
     private static ConfigDrivenConstraintMappingContributor runtimeConstraintMappingContributor(
-            ValidationProperties validationProperties,
+            BusinessValidationOverrideProperties businessValidationOverrideProperties,
             ObjectProvider<ValidationOverrideRegistry> validationOverrideRegistryProvider,
             ObjectProvider<GeneratedClassMetadataCache> generatedClassMetadataCacheProvider,
             ObjectProvider<ConstraintMergeService> constraintMergeServiceProvider,
@@ -186,7 +189,7 @@ public class ValidationAutoConfiguration {
     ) {
         ValidationOverrideRegistry validationOverrideRegistry = validationOverrideRegistryProvider
                 .getIfAvailable(() -> new ValidationOverrideRegistry(
-                        defaultValidationOverrideContributors(validationProperties, validationOverrideContributors)));
+                        defaultValidationOverrideContributors(businessValidationOverrideProperties, validationOverrideContributors)));
         GeneratedClassMetadataCache generatedClassMetadataCache = generatedClassMetadataCacheProvider
                 .getIfAvailable(() -> new GeneratedClassMetadataCache(validationOverrideRegistry));
         ConstraintMergeService constraintMergeService = constraintMergeServiceProvider
@@ -198,12 +201,12 @@ public class ValidationAutoConfiguration {
     }
 
     private static List<ValidationOverrideContributor> defaultValidationOverrideContributors(
-            ValidationProperties validationProperties,
+            BusinessValidationOverrideProperties businessValidationOverrideProperties,
             ObjectProvider<ValidationOverrideContributor> validationOverrideContributors
     ) {
         List<ValidationOverrideContributor> contributors = validationOverrideContributors.orderedStream().toList();
         return contributors.isEmpty()
-                ? List.of(new PropertiesValidationOverrideContributor(validationProperties))
+                ? List.of(new PropertiesValidationOverrideContributor(businessValidationOverrideProperties))
                 : contributors;
     }
 }

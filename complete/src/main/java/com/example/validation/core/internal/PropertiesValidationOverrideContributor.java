@@ -17,16 +17,16 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 
 	private static final Logger log = LoggerFactory.getLogger(PropertiesValidationOverrideContributor.class);
 
-	private final ValidationProperties validationProperties;
+	private final BusinessValidationOverrideProperties businessValidationOverrideProperties;
 
-	public PropertiesValidationOverrideContributor(ValidationProperties validationProperties) {
-		this.validationProperties = validationProperties;
+	public PropertiesValidationOverrideContributor(BusinessValidationOverrideProperties businessValidationOverrideProperties) {
+		this.businessValidationOverrideProperties = businessValidationOverrideProperties;
 	}
 
 	@Override
 	public List<ClassValidationOverride> getValidationOverrides() {
 		List<ClassValidationOverride> overrides = new ArrayList<>();
-		for (ValidationProperties.ClassMapping classMapping : validationProperties.getBusinessValidationOverride()) {
+		for (ValidationProperties.ClassMapping classMapping : businessValidationOverrideProperties.getBusinessValidationOverride()) {
 			if (classMapping == null) {
 				continue;
 			}

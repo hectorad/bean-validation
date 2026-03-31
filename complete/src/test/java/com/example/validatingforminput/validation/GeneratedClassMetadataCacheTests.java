@@ -1,6 +1,5 @@
 package com.example.validation.core.internal;
 
-import com.example.validation.core.api.*;
 import com.example.validation.core.spi.ClassValidationOverride;
 import com.example.validation.core.spi.ConstraintOverrideSet;
 import com.example.validation.core.spi.FieldValidationOverride;
@@ -32,14 +31,13 @@ import jakarta.validation.Payload;
 import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 
 @ExtendWith(OutputCaptureExtension.class)
 public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenClassDoesNotExist(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName("com.example.missing.MissingPerson");
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
@@ -59,7 +57,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenConfiguredFieldDoesNotExist(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
@@ -80,7 +78,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenNotBlankIsConfiguredForNonStringField(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 
@@ -99,7 +97,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenSizeIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 
@@ -118,7 +116,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenPatternIsConfiguredForNonStringField(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 
@@ -137,7 +135,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenExtensionsRuleIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedExtensionsFieldTypeTarget.class.getName());
 
@@ -156,7 +154,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldAllowExtensionsRuleOnAnySupportedFieldName() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(NonExtensionsMapTarget.class.getName());
 
@@ -177,7 +175,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenMinIsConfiguredForUnsupportedFieldType(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedConstraintTarget.class.getName());
 
@@ -196,7 +194,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldExtractDecimalBoundsFromAnnotations() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
@@ -263,7 +261,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenDecimalBoundsAreConfiguredForUnsupportedFieldType(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(UnsupportedDecimalConstraintTarget.class.getName());
 
@@ -282,7 +280,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndSkipWhenDecimalAnnotationValueIsMalformed(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(MalformedDecimalAnnotationTarget.class.getName());
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
@@ -298,7 +296,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndKeepFirstClassMappingWhenDuplicateClassMappingExists(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping1 = new ValidationProperties.ClassMapping();
 		classMapping1.setFullClassName(PersonForm.class.getName());
 		ValidationProperties.FieldMapping fieldMapping1 = new ValidationProperties.FieldMapping();
@@ -324,7 +322,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldWarnAndKeepFirstFieldMappingWhenDuplicateFieldMappingExists(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 
@@ -348,7 +346,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldSkipUnknownClassByDefault() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName("com.example.missing.MissingPerson");
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();
@@ -363,7 +361,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldSkipUnknownFieldAndKeepValidFieldByDefault() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		ValidationProperties.FieldMapping validField = new ValidationProperties.FieldMapping();
@@ -380,7 +378,7 @@ public class GeneratedClassMetadataCacheTests {
 
 	@Test
 	void shouldSkipIncompatibleConstraintAndKeepValidFieldByDefault() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 
@@ -411,7 +409,7 @@ public class GeneratedClassMetadataCacheTests {
 	}
 
 	private ResolvedFieldMapping resolveSingleField(Class<?> targetType, String fieldName) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(targetType.getName());
 		ValidationProperties.FieldMapping fieldMapping = new ValidationProperties.FieldMapping();

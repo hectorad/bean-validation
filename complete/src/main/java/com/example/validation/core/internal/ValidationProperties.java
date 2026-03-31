@@ -31,9 +31,6 @@ public class ValidationProperties {
     @Valid
     private MessageValidation messageValidation = new MessageValidation();
 
-    @Valid
-    private List<@NotNull @Valid ClassMapping> businessValidationOverride = new ArrayList<>();
-
     public boolean isValidationEnabled() {
         return validationEnabled;
     }
@@ -72,14 +69,6 @@ public class ValidationProperties {
 
     public void setMessageValidation(MessageValidation messageValidation) {
         this.messageValidation = defaultValue(messageValidation, MessageValidation::new);
-    }
-
-    public List<ClassMapping> getBusinessValidationOverride() {
-        return businessValidationOverride;
-    }
-
-    public void setBusinessValidationOverride(List<ClassMapping> businessValidationOverride) {
-        this.businessValidationOverride = copyList(businessValidationOverride);
     }
 
     static ConstraintOverrideSet toConstraintOverrideSet(Constraints constraints) {

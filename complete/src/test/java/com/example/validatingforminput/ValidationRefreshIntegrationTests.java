@@ -196,7 +196,7 @@ class ValidationRefreshIntegrationTests {
 			context.getBean(ContextRefresher.class),
 			context.getBean(PersonValidationService.class),
 			context.getBean(Validator.class),
-			context.getBean(ExternalPayloadValidator.class),
+			context.getBeanProvider(ExternalPayloadValidator.class).getIfAvailable(),
 			configFile);
 	}
 

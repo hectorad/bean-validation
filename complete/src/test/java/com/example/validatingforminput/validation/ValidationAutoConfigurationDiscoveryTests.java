@@ -22,7 +22,6 @@ import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
 
 import jakarta.validation.Configuration;
-import jakarta.validation.Validator;
 
 @ExtendWith(OutputCaptureExtension.class)
 class ValidationAutoConfigurationDiscoveryTests {
@@ -57,13 +56,32 @@ class ValidationAutoConfigurationDiscoveryTests {
 
 			assertThat(context.getBean(targetBeanName(context, "defaultValidator")))
 				.isInstanceOf(RequestAwareValidatingLocalValidatorFactoryBean.class);
+			assertThat(context.containsBean("configDrivenValidationConfigurationCustomizer")).isFalse();
 			assertThat(context.getBeansOfType(ConstraintMergeService.class)).isEmpty();
 			assertThat(context.getBeansOfType(ValidationOverrideRegistry.class)).isEmpty();
 			assertThat(context.getBeansOfType(GeneratedClassMetadataCache.class)).isEmpty();
+			assertThat(context.getBeansOfType(BusinessValidationOverrideProperties.class)).isEmpty();
+			assertThat(context.getBeansOfType(ExternalPayloadValidator.class)).isEmpty();
 			assertThat(context.getBeansOfType(com.example.validation.core.spi.ValidationOverrideContributor.class)).isEmpty();
 			assertThat(ReflectionTestUtils.getField(validator, "validatorFactory")).isNotNull();
 			assertThat(validator.usingContext()).isNotNull();
 			assertThat(validator.unwrap(jakarta.validation.ValidatorFactory.class)).isNotNull();
+		}
+	}
+
+	@Test
+	void shouldIgnoreInvalidOverrideConfigurationWhenValidationIsDisabled() {
+		try (ConfigurableApplicationContext context = new SpringApplicationBuilder(TestApplication.class)
+			.web(WebApplicationType.NONE)
+			.run(
+				"--com.ampp.validation-enabled=false",
+				"--com.ampp.businessValidationOverride[0].fullClassName=",
+				"--com.ampp.businessValidationOverride[0].fields[0].fieldName=",
+				"--com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=")) {
+			assertThat(context.containsBean("configDrivenValidationConfigurationCustomizer")).isFalse();
+			assertThat(context.getBeansOfType(BusinessValidationOverrideProperties.class)).isEmpty();
+			assertThat(context.getBeansOfType(ExternalPayloadValidator.class)).isEmpty();
+			assertThat(context.getBeansOfType(ValidationOverrideRegistry.class)).isEmpty();
 		}
 	}
 

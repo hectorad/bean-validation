@@ -20,7 +20,7 @@ class PropertiesValidationOverrideContributorTests {
 
 	@Test
 	void shouldSkipOnlyFieldWithMalformedConstraintEntryAndKeepOtherFields(CapturedOutput output) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(
@@ -43,7 +43,7 @@ class PropertiesValidationOverrideContributorTests {
 
 	@Test
 	void shouldPreserveIndependentMessagesForPatternEntries() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(field(
@@ -63,7 +63,7 @@ class PropertiesValidationOverrideContributorTests {
 
 	@Test
 	void shouldApplySharedSizeMessageToBothBounds() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(field(
@@ -85,7 +85,7 @@ class PropertiesValidationOverrideContributorTests {
 
 	@Test
 	void shouldApplySharedSizeMessageToMinOnlyBound() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(field(
@@ -265,7 +265,7 @@ class PropertiesValidationOverrideContributorTests {
 
 	@Test
 	void shouldApplySharedSizeMessageToMaxOnlyBound() {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(field(
@@ -285,7 +285,7 @@ class PropertiesValidationOverrideContributorTests {
 	private ConstraintOverrideSet singleFieldConstraints(
 		ValidationProperties.ConstraintMapping... constraints
 	) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(field("name", constraints)));
@@ -300,7 +300,7 @@ class PropertiesValidationOverrideContributorTests {
 		ValidationProperties.ConstraintMapping badConstraint,
 		String expectedErrorFragment
 	) {
-		ValidationProperties properties = new ValidationProperties();
+		BusinessValidationOverrideProperties properties = new BusinessValidationOverrideProperties();
 		ValidationProperties.ClassMapping classMapping = new ValidationProperties.ClassMapping();
 		classMapping.setFullClassName(PersonForm.class.getName());
 		classMapping.setFields(List.of(

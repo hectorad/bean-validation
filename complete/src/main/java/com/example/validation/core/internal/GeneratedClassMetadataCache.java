@@ -62,8 +62,8 @@ public class GeneratedClassMetadataCache {
 
 	private final List<ResolvedClassMapping> resolvedClassMappings;
 
-	public GeneratedClassMetadataCache(ValidationProperties validationProperties) {
-		this(new ValidationOverrideRegistry(List.of(new PropertiesValidationOverrideContributor(validationProperties))));
+	public GeneratedClassMetadataCache(BusinessValidationOverrideProperties businessValidationOverrideProperties) {
+		this(new ValidationOverrideRegistry(List.of(new PropertiesValidationOverrideContributor(businessValidationOverrideProperties))));
 	}
 
 	public GeneratedClassMetadataCache(ValidationOverrideRegistry validationOverrideRegistry) {

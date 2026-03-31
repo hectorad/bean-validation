@@ -32,7 +32,7 @@ This framework provides a config-driven validation override system built on Jaka
 - Validate Spring `Message<?>` payloads with a reusable `MessageHandler` decorator
 - Merge strategy that always selects the stricter constraint (configuration cannot weaken baseline annotations)
 - Pluggable contributor SPI (`FieldConstraintContributor`) for programmatic constraint sources
-- All configuration is validated eagerly at startup; invalid config prevents the application from booting
+- Configuration is validated eagerly at startup while global validation is enabled; invalid override config prevents the application from booting
 
 **When to use this:** When the same domain model is shared across services or environments that need different validation strictness levels, configurable without code changes. Examples include per-tenant validation rules, environment-specific constraints (dev vs. production), or multi-region regulatory differences.
 
@@ -167,7 +167,7 @@ com.ampp:
               message: <optional message>
 ```
 
-Each class mapping identifies a Java class by its fully-qualified name and lists the fields to configure. Each field mapping specifies one or more constraint entries.
+Each class mapping identifies a Java class by its fully-qualified name and lists the fields to configure. Each field mapping specifies one or more constraint entries. This subtree is bound and validated only when `validation-enabled=true`.
 
 ---
 
@@ -175,7 +175,7 @@ Each class mapping identifies a Java class by its fully-qualified name and lists
 
 | Property | Type | Default | Description |
 |---|---|---|---|
-| `validation-enabled` | `boolean` | `true` | Global kill switch. When `false`, Bean Validation is disabled for MVC, method validation, and direct validator usage. |
+| `validation-enabled` | `boolean` | `true` | Global kill switch. When `false`, Bean Validation is disabled for MVC, method validation, and direct validator usage, and `businessValidationOverride` is ignored. |
 | `request-validation-bypass.enabled` | `boolean` | `false` | Enables a per-request validation bypass controlled by a trusted request header. |
 | `request-validation-bypass.header-name` | `String` | `X-Skip-Validation` | Header name checked on the current servlet request. |
 | `request-validation-bypass.header-value` | `String` | `true` | Exact header value required to bypass validation. |
@@ -190,7 +190,7 @@ com.ampp:
     header-value: true
 ```
 
-Precedence is explicit: `validation-enabled=false` disables validation everywhere first. When global validation remains enabled, the request-bypass header can skip validation only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
+Precedence is explicit: `validation-enabled=false` disables validation everywhere first and skips binding and validating `businessValidationOverride` entirely. When global validation remains enabled, the request-bypass header can skip validation only for work that runs on the current HTTP request thread. Startup validation and non-request code paths still validate normally.
 
 **Trust boundary:** Treat the bypass header as an internal escape hatch. External traffic should not be allowed to set it directly; strip or overwrite it at the gateway or proxy layer before requests reach the application.
 
