@@ -12,7 +12,6 @@ import org.springframework.core.Ordered;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 public class PropertiesValidationOverrideContributor implements ValidationOverrideContributor, Ordered {
 
@@ -89,32 +88,38 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 		ConstraintOverrideSet target,
 		ValidationProperties.ConstraintMapping constraint
 	) {
-		if (constraint == null) {
-			throw new IllegalArgumentException("constraint entry must not be null");
-		}
-		ConstraintType constraintType = ConstraintType.from(constraint.getConstraintType());
-		ValidationProperties.ConstraintParameters params = constraint.getParams();
-		String message = constraint.getMessage();
-		switch (constraintType) {
-			case NOT_NULL -> enable(target.getNotNull(), message);
-			case NOT_BLANK -> enable(target.getNotBlank(), message);
-			case MIN -> applyNumericConstraint(target.getMin(), requiredLong(params.getValue(), "params.value"), message, true);
-			case MAX -> applyNumericConstraint(target.getMax(), requiredLong(params.getValue(), "params.value"), message, false);
+		ConstraintParser.ParsedConstraint parsedConstraint = ConstraintParser.parse(constraint);
+		switch (parsedConstraint.constraintType()) {
+			case NOT_NULL -> enable(target.getNotNull(), parsedConstraint.message());
+			case NOT_BLANK -> enable(target.getNotBlank(), parsedConstraint.message());
+			case MIN -> applyNumericConstraint(target.getMin(), parsedConstraint.value(), parsedConstraint.message(), true);
+			case MAX -> applyNumericConstraint(target.getMax(), parsedConstraint.value(), parsedConstraint.message(), false);
 			case DECIMAL_MIN -> applyDecimalConstraint(
 				target.getDecimalMin(),
-				requiredDecimal(params.getValue(), "params.value"),
-				params.getInclusive(),
-				message,
+				parsedConstraint.decimalValue(),
+				parsedConstraint.inclusive(),
+				parsedConstraint.message(),
 				true);
 			case DECIMAL_MAX -> applyDecimalConstraint(
 				target.getDecimalMax(),
-				requiredDecimal(params.getValue(), "params.value"),
-				params.getInclusive(),
-				message,
+				parsedConstraint.decimalValue(),
+				parsedConstraint.inclusive(),
+				parsedConstraint.message(),
 				false);
-			case SIZE -> applySizeConstraint(target.getSize(), params, message);
-			case PATTERN -> applyPatternConstraint(target.getPattern(), params, message);
-			case EXTENSIONS -> applyExtensionConstraint(target.getExtensions(), params, message);
+			case SIZE -> applySizeConstraint(
+				target.getSize(),
+				parsedConstraint.min(),
+				parsedConstraint.max(),
+				parsedConstraint.message());
+			case PATTERN -> applyPatternConstraint(
+				target.getPattern(),
+				parsedConstraint.regexp(),
+				parsedConstraint.message());
+			case EXTENSIONS -> applyExtensionConstraint(
+				target.getExtensions(),
+				parsedConstraint.jsonPath(),
+				parsedConstraint.regexp(),
+				parsedConstraint.message());
 		}
 	}
 
@@ -171,14 +176,10 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 
 	private void applySizeConstraint(
 		ConstraintOverrideSet.SizeConstraint target,
-		ValidationProperties.ConstraintParameters params,
+		Long min,
+		Long max,
 		String sharedMessage
 	) {
-		Long min = params.getMin();
-		Long max = params.getMax();
-		if (min == null && max == null) {
-			throw new IllegalArgumentException("Size requires params.min or params.max");
-		}
 		if (min != null) {
 			applyNumericConstraint(
 				target.getMin(),
@@ -197,13 +198,9 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 
 	private void applyPatternConstraint(
 		ConstraintOverrideSet.PatternConstraint target,
-		ValidationProperties.ConstraintParameters params,
+		String regex,
 		String message
 	) {
-		String regex = params.getRegexp();
-		if (regex == null) {
-			throw new IllegalArgumentException("Pattern requires params.regexp");
-		}
 		ConstraintOverrideSet.PatternRuleConfig rule = new ConstraintOverrideSet.PatternRuleConfig();
 		rule.setRegex(regex);
 		rule.setMessage(message);
@@ -212,78 +209,15 @@ public class PropertiesValidationOverrideContributor implements ValidationOverri
 
 	private void applyExtensionConstraint(
 		ConstraintOverrideSet.ExtensionsConstraint target,
-		ValidationProperties.ConstraintParameters params,
+		String jsonPath,
+		String regex,
 		String message
 	) {
-		String jsonPath = params.getJsonPath();
-		String regex = params.getRegexp();
-		if (jsonPath == null) {
-			throw new IllegalArgumentException("Extensions requires params.jsonPath");
-		}
-		if (regex == null) {
-			throw new IllegalArgumentException("Extensions requires params.regexp");
-		}
 		ConstraintOverrideSet.ExtensionRule rule = new ConstraintOverrideSet.ExtensionRule();
 		rule.setJsonPath(jsonPath);
 		rule.setRegex(regex);
 		rule.setMessage(message);
 		target.getRules().add(rule);
-	}
-
-	private BigDecimal requiredDecimal(BigDecimal value, String propertyName) {
-		if (value == null) {
-			throw new IllegalArgumentException(propertyName + " must be provided");
-		}
-		return value;
-	}
-
-	private long requiredLong(BigDecimal value, String propertyName) {
-		BigDecimal required = requiredDecimal(value, propertyName);
-		try {
-			return required.longValueExact();
-		}
-		catch (ArithmeticException exception) {
-			throw new IllegalArgumentException(propertyName + " must be an integer", exception);
-		}
-	}
-
-	private enum ConstraintType {
-		NOT_NULL,
-		NOT_BLANK,
-		MIN,
-		MAX,
-		DECIMAL_MIN,
-		DECIMAL_MAX,
-		SIZE,
-		PATTERN,
-		EXTENSIONS;
-
-		private static ConstraintType from(String rawValue) {
-			String normalized = normalize(rawValue);
-			return switch (normalized) {
-				case "notnull" -> NOT_NULL;
-				case "notblank" -> NOT_BLANK;
-				case "min" -> MIN;
-				case "max" -> MAX;
-				case "decimalmin" -> DECIMAL_MIN;
-				case "decimalmax" -> DECIMAL_MAX;
-				case "size" -> SIZE;
-				case "pattern" -> PATTERN;
-				case "extensions" -> EXTENSIONS;
-				default -> throw new IllegalArgumentException("Unsupported constraintType: " + rawValue);
-			};
-		}
-
-		private static String normalize(String rawValue) {
-			if (rawValue == null) {
-				return "";
-			}
-			return rawValue
-				.replace("-", "")
-				.replace("_", "")
-				.replace(" ", "")
-				.toLowerCase(Locale.ROOT);
-		}
 	}
 
 	private static final class FieldConstraintConfigurationException extends RuntimeException {
