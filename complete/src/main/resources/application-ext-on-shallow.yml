@@ -1,0 +1,50 @@
+com.ampp:
+  businessValidationOverride:
+    - fullClassName: com.example.validatingforminput.PersonForm
+      fields:
+        - fieldName: name
+          constraints:
+            - constraintType: NotNull
+              message: Name is required
+            - constraintType: NotBlank
+              message: Name must not be blank
+            - constraintType: Size
+              params:
+                min: 20
+                max: 30
+              message: Name must be between 20 and 30 characters
+            - constraintType: Pattern
+              params:
+                regexp: "^[A-Za-z ]+$"
+              message: Name may contain letters and spaces only
+        - fieldName: age
+          constraints:
+            - constraintType: NotNull
+              message: Age is required
+            - constraintType: Min
+              params:
+                value: 20
+              message: Age must be at least 20
+            - constraintType: Max
+              params:
+                value: 60
+              message: Age must be at most 60
+        - fieldName: salary
+          constraints:
+            - constraintType: DecimalMin
+              params:
+                value: 1000.1
+                inclusive: false
+              message: Salary must be greater than 1000.10
+            - constraintType: DecimalMax
+              params:
+                value: 250000.00
+              message: Salary must be at most 250000.00
+        - fieldName: extensions
+          constraints:
+            - constraintType: Extensions
+              params:
+                jsonPath: $.vendorExtensionCode
+                regexp: "^[A-Z]{3}-[0-9]{4}$"
+              message: Vendor extension code format is invalid
+  validation-enabled: true
