@@ -31,6 +31,9 @@ public class ValidationProperties {
     @Valid
     private MessageValidation messageValidation = new MessageValidation();
 
+    @Valid
+    private PerfEndpoints perfEndpoints = new PerfEndpoints();
+
     public boolean isValidationEnabled() {
         return validationEnabled;
     }
@@ -69,6 +72,14 @@ public class ValidationProperties {
 
     public void setMessageValidation(MessageValidation messageValidation) {
         this.messageValidation = defaultValue(messageValidation, MessageValidation::new);
+    }
+
+    public PerfEndpoints getPerfEndpoints() {
+        return perfEndpoints;
+    }
+
+    public void setPerfEndpoints(PerfEndpoints perfEndpoints) {
+        this.perfEndpoints = defaultValue(perfEndpoints, PerfEndpoints::new);
     }
 
     static ConstraintOverrideSet toConstraintOverrideSet(Constraints constraints) {
@@ -184,6 +195,19 @@ public class ValidationProperties {
     }
 
     public static class MessageValidation {
+
+        private boolean enabled = false;
+
+        public boolean isEnabled() {
+            return enabled;
+        }
+
+        public void setEnabled(boolean enabled) {
+            this.enabled = enabled;
+        }
+    }
+
+    public static class PerfEndpoints {
 
         private boolean enabled = false;
 

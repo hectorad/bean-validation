@@ -1,16 +1,21 @@
 # Performance Testing
 
-The repo now supports a Maven-first JMH benchmark for measuring the steady-state validation cost of the `Extensions` constraint.
+This repo now supports two complementary perf paths for the `Extensions` validator:
 
-## Run the benchmark
+- JMH for isolated `Validator.validate(...)` cost
+- Gatling for end-to-end HTTP cost through dedicated perf endpoints
 
-Use the Maven wrapper from the repo root:
+The old `POST /` Thymeleaf form path is intentionally not used for `extensions` perf measurements because that MVC flow does not bind an `extensions` JSON payload into the form object.
+
+## JMH
+
+Run the full benchmark:
 
 ```bash
 ./mvnw jmh:benchmark -Djmh.benchmarks=ExtensionsValidatorBenchmark
 ```
 
-For a fast smoke run while you are iterating on the benchmark itself:
+Run the fast smoke version:
 
 ```bash
 ./mvnw jmh:benchmark \
@@ -18,7 +23,7 @@ For a fast smoke run while you are iterating on the benchmark itself:
   -Djmh.f=1 -Djmh.wi=1 -Djmh.i=1 -Djmh.w=200ms -Djmh.r=200ms
 ```
 
-The default configuration is tuned for local comparisons:
+Default JMH settings:
 
 - average time mode
 - microseconds output
@@ -26,40 +31,141 @@ The default configuration is tuned for local comparisons:
 - 5 warmup iterations at 1 second each
 - 10 measurement iterations at 1 second each
 
-Results are written to `target/jmh-results/extensions-validator.json`.
+Results are written to [extensions-validator.json](/Users/hectorad/Developer/gs-validating-form-input/complete/target/jmh-results/extensions-validator.json).
 
-## What it measures
+### JMH matrix
 
-`ExtensionsValidatorBenchmark` runs five scenarios against `Validator.validate(PersonForm)`:
+`ExtensionsValidatorBenchmark` measures four validator modes across two payload representations:
 
-- `baseline_shallow_payload`
-- `shallow_path_on_shallow_payload`
-- `baseline_deep_payload`
-- `shallow_path_on_deep_payload`
-- `deep_path_on_deep_payload`
+- `validationOff`: `com.ampp.validation-enabled=false`
+- `baselineOn`: validation enabled, no `Extensions` override
+- `shallowRule`: `jsonPath=$.vendorExtensionCode`
+- `deepRule`: `jsonPath=$.vendor.contact.codes[*].value`
 
-Those comparisons let you separate three costs:
+Measured scenarios:
 
-- extension validator overhead on a small payload
-- larger payload overhead while keeping JSONPath shallow
-- extra traversal depth and wildcard iteration cost on the same deep payload
+- `off_map_shallow_payload`
+- `off_map_deep_payload`
+- `baseline_map_shallow_payload`
+- `baseline_map_deep_payload`
+- `shallow_path_on_map_shallow_payload`
+- `shallow_path_on_map_deep_payload`
+- `deep_path_on_map_deep_payload`
+- `off_json_shallow_payload`
+- `off_json_deep_payload`
+- `baseline_json_shallow_payload`
+- `baseline_json_deep_payload`
+- `shallow_path_on_json_shallow_payload`
+- `shallow_path_on_json_deep_payload`
+- `deep_path_on_json_deep_payload`
 
-## Payload shapes
-
-The benchmark uses `Map<String, Object>` payloads instead of raw JSON strings.
+Payload shapes:
 
 - shallow payload: top-level `vendorExtensionCode`
-- deep payload: top-level `vendorExtensionCode` plus `vendor.contact.codes[*].value` with exactly 3 matching candidates
+- deep payload: top-level `vendorExtensionCode` plus `vendor.contact.codes[*].value` with 3 wildcard candidates
 
-That means `shallow_path_on_deep_payload` and `deep_path_on_deep_payload` run on the same body, which keeps payload size constant while changing only the JSONPath traversal work.
+The deep payload intentionally includes the top-level shallow key, so `shallow_path_on_*_deep_payload` and `deep_path_on_*_deep_payload` run on the same body and isolate traversal-depth cost from payload-size cost.
 
-## Notes
+### JMH setup checks
 
-The benchmark validates its own setup before timing starts:
+The benchmark asserts correctness before timing starts:
 
-- shallow validator accepts the shallow payload
-- shallow validator accepts the deep payload
-- deep validator accepts the deep payload
-- invalid shallow and deep variants each produce exactly one violation
+- validation off accepts invalid map/raw payloads and malformed raw JSON strings
+- baseline validation accepts valid payloads and ignores invalid extension content because no `Extensions` rule is active
+- shallow validation accepts shallow and deep payloads, rejects invalid shallow payloads, and rejects malformed raw JSON
+- deep validation accepts deep payloads and rejects invalid deep payloads
 
-If you want an end-to-end HTTP load test instead of isolated validator cost, the existing Gatling profile is still available under `src/gatling/java`.
+## HTTP / Gatling
+
+The perf-only endpoints are disabled by default and are enabled with:
+
+```bash
+--com.ampp.perf-endpoints.enabled=true
+```
+
+Endpoints:
+
+- `POST /perf/validate/extensions/map`
+- `POST /perf/validate/extensions/raw`
+
+### Start the app
+
+Build the jar once:
+
+```bash
+./mvnw -DskipTests package
+```
+
+Validation off:
+
+```bash
+java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
+  --com.ampp.perf-endpoints.enabled=true \
+  --com.ampp.validation-enabled=false
+```
+
+Shallow rule:
+
+```bash
+noglob java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
+  --com.ampp.perf-endpoints.enabled=true \
+  --com.ampp.validation-enabled=true \
+  --com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.perf.PerfMapValidationRequest \
+  --com.ampp.businessValidationOverride[0].fields[0].fieldName=extensions \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.vendorExtensionCode \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$ \
+  --com.ampp.businessValidationOverride[1].fullClassName=com.example.validatingforminput.perf.PerfRawValidationRequest \
+  --com.ampp.businessValidationOverride[1].fields[0].fieldName=extensions \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.vendorExtensionCode \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$
+```
+
+Deep rule:
+
+```bash
+noglob java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
+  --com.ampp.perf-endpoints.enabled=true \
+  --com.ampp.validation-enabled=true \
+  --com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.perf.PerfMapValidationRequest \
+  --com.ampp.businessValidationOverride[0].fields[0].fieldName=extensions \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$ \
+  --com.ampp.businessValidationOverride[1].fullClassName=com.example.validatingforminput.perf.PerfRawValidationRequest \
+  --com.ampp.businessValidationOverride[1].fields[0].fieldName=extensions \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$
+```
+
+### Run Gatling
+
+Example:
+
+```bash
+./mvnw -Pperformance gatling:test \
+  -DbaseUrl=http://localhost:8080 \
+  -Drps=50 -Dduration=5 -Dwarmup=2 \
+  -DbodyMode=map \
+  -DpayloadShape=deep \
+  -Drun.label=deep-map-deep
+```
+
+The most useful HTTP comparison set is the same deep payload across all three modes:
+
+- `off/map`
+- `off/raw`
+- `shallow/map`
+- `shallow/raw`
+- `deep/map`
+- `deep/raw`
+
+Use `payloadShape=deep` for those runs so the shallow and deep validators inspect the same body.
+
+Generated Gatling reports go under `target/gatling/`.
+
+## Current report
+
+The latest combined write-up is in [extensions-validator-benchmark-report.md](/Users/hectorad/Developer/gs-validating-form-input/complete/docs/extensions-validator-benchmark-report.md).

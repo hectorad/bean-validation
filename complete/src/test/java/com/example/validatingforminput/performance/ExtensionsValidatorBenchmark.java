@@ -1,11 +1,5 @@
 package com.example.validatingforminput.performance;
 
-import java.io.IOException;
-import java.math.BigDecimal;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
@@ -24,7 +18,9 @@ import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
 
-import com.example.validatingforminput.PersonForm;
+import com.example.validatingforminput.perf.PerfMapValidationRequest;
+import com.example.validatingforminput.perf.PerfPayloadFixtures;
+import com.example.validatingforminput.perf.PerfRawValidationRequest;
 
 import jakarta.validation.ConstraintViolation;
 import jakarta.validation.Validator;
@@ -33,194 +29,238 @@ import jakarta.validation.Validator;
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 public class ExtensionsValidatorBenchmark {
 
-	private static final String PERSON_FORM_CLASS_NAME = "com.example.validatingforminput.PersonForm";
+    private static final String MAP_REQUEST_CLASS_NAME = "com.example.validatingforminput.perf.PerfMapValidationRequest";
+    private static final String RAW_REQUEST_CLASS_NAME = "com.example.validatingforminput.perf.PerfRawValidationRequest";
+    private static final String EXTENSIONS_FIELD_NAME = "extensions";
+    private static final String CODE_REGEX = "^[A-Z]{3}-[0-9]{4}$";
 
-	private static final String EXTENSIONS_FIELD_NAME = "extensions";
+    @Benchmark
+    public int off_map_shallow_payload(BenchmarkState state) {
+        return countViolations(state.validationOffValidator, state.shallowMapRequest);
+    }
 
-	private static final String CODE_REGEX = "^[A-Z]{3}-[0-9]{4}$";
+    @Benchmark
+    public int off_map_deep_payload(BenchmarkState state) {
+        return countViolations(state.validationOffValidator, state.deepMapRequest);
+    }
 
-	static {
-		ensureResultsDirectoryExists();
-	}
+    @Benchmark
+    public int baseline_map_shallow_payload(BenchmarkState state) {
+        return countViolations(state.baselineValidator, state.shallowMapRequest);
+    }
 
-	@Benchmark
-	public int baseline_shallow_payload(BenchmarkState state) {
-		return state.baselineValidator.validate(state.shallowForm).size();
-	}
+    @Benchmark
+    public int baseline_map_deep_payload(BenchmarkState state) {
+        return countViolations(state.baselineValidator, state.deepMapRequest);
+    }
 
-	@Benchmark
-	public int shallow_path_on_shallow_payload(BenchmarkState state) {
-		return state.shallowValidator.validate(state.shallowForm).size();
-	}
+    @Benchmark
+    public int shallow_path_on_map_shallow_payload(BenchmarkState state) {
+        return countViolations(state.shallowValidator, state.shallowMapRequest);
+    }
 
-	@Benchmark
-	public int baseline_deep_payload(BenchmarkState state) {
-		return state.baselineValidator.validate(state.deepForm).size();
-	}
+    @Benchmark
+    public int shallow_path_on_map_deep_payload(BenchmarkState state) {
+        return countViolations(state.shallowValidator, state.deepMapRequest);
+    }
 
-	@Benchmark
-	public int shallow_path_on_deep_payload(BenchmarkState state) {
-		return state.shallowValidator.validate(state.deepForm).size();
-	}
+    @Benchmark
+    public int deep_path_on_map_deep_payload(BenchmarkState state) {
+        return countViolations(state.deepValidator, state.deepMapRequest);
+    }
 
-	@Benchmark
-	public int deep_path_on_deep_payload(BenchmarkState state) {
-		return state.deepValidator.validate(state.deepForm).size();
-	}
+    @Benchmark
+    public int off_json_shallow_payload(BenchmarkState state) {
+        return countViolations(state.validationOffValidator, state.shallowRawRequest);
+    }
 
-	@State(Scope.Benchmark)
-	public static class BenchmarkState {
+    @Benchmark
+    public int off_json_deep_payload(BenchmarkState state) {
+        return countViolations(state.validationOffValidator, state.deepRawRequest);
+    }
 
-		private ConfigurableApplicationContext baselineContext;
+    @Benchmark
+    public int baseline_json_shallow_payload(BenchmarkState state) {
+        return countViolations(state.baselineValidator, state.shallowRawRequest);
+    }
 
-		private ConfigurableApplicationContext shallowContext;
+    @Benchmark
+    public int baseline_json_deep_payload(BenchmarkState state) {
+        return countViolations(state.baselineValidator, state.deepRawRequest);
+    }
 
-		private ConfigurableApplicationContext deepContext;
+    @Benchmark
+    public int shallow_path_on_json_shallow_payload(BenchmarkState state) {
+        return countViolations(state.shallowValidator, state.shallowRawRequest);
+    }
 
-		private Validator baselineValidator;
+    @Benchmark
+    public int shallow_path_on_json_deep_payload(BenchmarkState state) {
+        return countViolations(state.shallowValidator, state.deepRawRequest);
+    }
 
-		private Validator shallowValidator;
+    @Benchmark
+    public int deep_path_on_json_deep_payload(BenchmarkState state) {
+        return countViolations(state.deepValidator, state.deepRawRequest);
+    }
 
-		private Validator deepValidator;
+    @State(Scope.Benchmark)
+    public static class BenchmarkState {
 
-		private PersonForm shallowForm;
+        private ConfigurableApplicationContext validationOffContext;
+        private ConfigurableApplicationContext baselineContext;
+        private ConfigurableApplicationContext shallowContext;
+        private ConfigurableApplicationContext deepContext;
 
-		private PersonForm deepForm;
+        private Validator validationOffValidator;
+        private Validator baselineValidator;
+        private Validator shallowValidator;
+        private Validator deepValidator;
 
-		@Setup(Level.Trial)
-		public void setUp() {
-			baselineContext = startContext(baseProperties());
-			shallowContext = startContext(extensionProperties("$.vendorExtensionCode"));
-			deepContext = startContext(extensionProperties("$.vendor.contact.codes[*].value"));
+        private PerfMapValidationRequest shallowMapRequest;
+        private PerfMapValidationRequest deepMapRequest;
+        private PerfMapValidationRequest invalidShallowMapRequest;
+        private PerfMapValidationRequest invalidDeepMapRequest;
 
-			baselineValidator = baselineContext.getBean(Validator.class);
-			shallowValidator = shallowContext.getBean(Validator.class);
-			deepValidator = deepContext.getBean(Validator.class);
+        private PerfRawValidationRequest shallowRawRequest;
+        private PerfRawValidationRequest deepRawRequest;
+        private PerfRawValidationRequest invalidShallowRawRequest;
+        private PerfRawValidationRequest invalidDeepRawRequest;
+        private PerfRawValidationRequest malformedRawRequest;
 
-			shallowForm = validForm(shallowPayload());
-			deepForm = validForm(deepPayload());
+        @Setup(Level.Trial)
+        public void setUp() {
+            validationOffContext = startContext(validationOffProperties());
+            baselineContext = startContext(baselineProperties());
+            shallowContext = startContext(extensionProperties("$.vendorExtensionCode"));
+            deepContext = startContext(extensionProperties("$.vendor.contact.codes[*].value"));
 
-			assertValid("baseline validator should accept shallow payload", baselineValidator, shallowForm);
-			assertValid("baseline validator should accept deep payload", baselineValidator, deepForm);
-			assertValid("shallow validator should accept shallow payload", shallowValidator, shallowForm);
-			assertValid("shallow validator should accept deep payload", shallowValidator, deepForm);
-			assertValid("deep validator should accept deep payload", deepValidator, deepForm);
-			assertSingleViolation(
-				"shallow validator should reject invalid shallow payload",
-				shallowValidator,
-				validForm(invalidShallowPayload()));
-			assertSingleViolation(
-				"deep validator should reject invalid deep payload",
-				deepValidator,
-				validForm(invalidDeepPayload()));
-		}
+            validationOffValidator = validationOffContext.getBean(Validator.class);
+            baselineValidator = baselineContext.getBean(Validator.class);
+            shallowValidator = shallowContext.getBean(Validator.class);
+            deepValidator = deepContext.getBean(Validator.class);
 
-		@TearDown(Level.Trial)
-		public void tearDown() {
-			close(baselineContext);
-			close(shallowContext);
-			close(deepContext);
-		}
+            shallowMapRequest = PerfPayloadFixtures.shallowMapRequest();
+            deepMapRequest = PerfPayloadFixtures.deepMapRequest();
+            invalidShallowMapRequest = PerfPayloadFixtures.invalidShallowMapRequest();
+            invalidDeepMapRequest = PerfPayloadFixtures.invalidDeepMapRequest();
 
-		private static void close(ConfigurableApplicationContext context) {
-			if (context != null) {
-				context.close();
-			}
-		}
+            shallowRawRequest = PerfPayloadFixtures.shallowRawRequest();
+            deepRawRequest = PerfPayloadFixtures.deepRawRequest();
+            invalidShallowRawRequest = PerfPayloadFixtures.invalidShallowRawRequest();
+            invalidDeepRawRequest = PerfPayloadFixtures.invalidDeepRawRequest();
+            malformedRawRequest = PerfPayloadFixtures.malformedRawRequest();
 
-		private static void assertValid(String message, Validator validator, PersonForm form) {
-			Set<ConstraintViolation<PersonForm>> violations = validator.validate(form);
-			if (!violations.isEmpty()) {
-				throw new IllegalStateException(message + ": " + violations);
-			}
-		}
+            assertValid("validation off should allow invalid shallow map payload", validationOffValidator, invalidShallowMapRequest);
+            assertValid("validation off should allow invalid deep map payload", validationOffValidator, invalidDeepMapRequest);
+            assertValid("validation off should allow invalid shallow raw payload", validationOffValidator, invalidShallowRawRequest);
+            assertValid("validation off should allow malformed raw payload", validationOffValidator, malformedRawRequest);
 
-		private static void assertSingleViolation(String message, Validator validator, PersonForm form) {
-			Set<ConstraintViolation<PersonForm>> violations = validator.validate(form);
-			if (violations.size() != 1) {
-				throw new IllegalStateException(message + ": " + violations);
-			}
-		}
-	}
+            assertValid("baseline validator should accept shallow map payload", baselineValidator, shallowMapRequest);
+            assertValid("baseline validator should accept deep map payload", baselineValidator, deepMapRequest);
+            assertValid("baseline validator should accept shallow raw payload", baselineValidator, shallowRawRequest);
+            assertValid("baseline validator should accept deep raw payload", baselineValidator, deepRawRequest);
+            assertValid("baseline validator should allow invalid shallow map extension payload", baselineValidator, invalidShallowMapRequest);
+            assertValid("baseline validator should allow invalid deep raw extension payload", baselineValidator, invalidDeepRawRequest);
+            assertValid("baseline validator should allow malformed raw extension payload", baselineValidator, malformedRawRequest);
 
-	@SpringBootConfiguration(proxyBeanMethods = false)
-	@EnableAutoConfiguration
-	static class BenchmarkApplication {
-	}
+            assertValid("shallow validator should accept shallow map payload", shallowValidator, shallowMapRequest);
+            assertValid("shallow validator should accept deep map payload", shallowValidator, deepMapRequest);
+            assertValid("shallow validator should accept shallow raw payload", shallowValidator, shallowRawRequest);
+            assertValid("shallow validator should accept deep raw payload", shallowValidator, deepRawRequest);
+            assertSingleViolation("shallow validator should reject invalid shallow map payload", shallowValidator, invalidShallowMapRequest);
+            assertSingleViolation("shallow validator should reject invalid shallow raw payload", shallowValidator, invalidShallowRawRequest);
+            assertSingleViolation("shallow validator should reject malformed raw payload", shallowValidator, malformedRawRequest);
 
-	private static ConfigurableApplicationContext startContext(String... properties) {
-		return new SpringApplicationBuilder(BenchmarkApplication.class)
-			.web(WebApplicationType.NONE)
-			.properties(properties)
-			.run();
-	}
+            assertValid("deep validator should accept deep map payload", deepValidator, deepMapRequest);
+            assertValid("deep validator should accept deep raw payload", deepValidator, deepRawRequest);
+            assertSingleViolation("deep validator should reject invalid deep map payload", deepValidator, invalidDeepMapRequest);
+            assertSingleViolation("deep validator should reject invalid deep raw payload", deepValidator, invalidDeepRawRequest);
+        }
 
-	private static String[] baseProperties() {
-		return new String[] {
-			"spring.config.name=validation-benchmark",
-			"spring.main.banner-mode=off",
-			"logging.level.root=ERROR"
-		};
-	}
+        @TearDown(Level.Trial)
+        public void tearDown() {
+            close(validationOffContext);
+            close(baselineContext);
+            close(shallowContext);
+            close(deepContext);
+        }
 
-	private static String[] extensionProperties(String jsonPath) {
-		return new String[] {
-			"spring.config.name=validation-benchmark",
-			"spring.main.banner-mode=off",
-			"logging.level.root=ERROR",
-			"com.ampp.businessValidationOverride[0].fullClassName=" + PERSON_FORM_CLASS_NAME,
-			"com.ampp.businessValidationOverride[0].fields[0].fieldName=" + EXTENSIONS_FIELD_NAME,
-			"com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions",
-			"com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=" + jsonPath,
-			"com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=" + CODE_REGEX
-		};
-	}
+        private static void close(ConfigurableApplicationContext context) {
+            if (context != null) {
+                context.close();
+            }
+        }
 
-	private static PersonForm validForm(Map<String, Object> extensions) {
-		PersonForm form = new PersonForm();
-		form.setName("Robert");
-		form.setAge(30);
-		form.setSalary(new BigDecimal("2000.00"));
-		form.setExtensions(extensions);
-		return form;
-	}
+        private static void assertValid(String message, Validator validator, Object target) {
+            Set<? extends ConstraintViolation<?>> violations = validator.validate(target);
+            if (!violations.isEmpty()) {
+                throw new IllegalStateException(message + ": " + violations);
+            }
+        }
 
-	private static Map<String, Object> shallowPayload() {
-		return Map.of("vendorExtensionCode", "ABC-1234");
-	}
+        private static void assertSingleViolation(String message, Validator validator, Object target) {
+            Set<? extends ConstraintViolation<?>> violations = validator.validate(target);
+            if (violations.size() != 1) {
+                throw new IllegalStateException(message + ": " + violations);
+            }
+        }
+    }
 
-	private static Map<String, Object> invalidShallowPayload() {
-		return Map.of("vendorExtensionCode", "abc-1234");
-	}
+    @SpringBootConfiguration(proxyBeanMethods = false)
+    @EnableAutoConfiguration
+    static class BenchmarkApplication {
+    }
 
-	private static Map<String, Object> deepPayload() {
-		return Map.of(
-			"vendorExtensionCode", "ABC-1234",
-			"vendor", Map.of(
-				"contact", Map.of(
-					"codes", List.of(
-						Map.of("value", "ABC-1234"),
-						Map.of("value", "DEF-5678"),
-						Map.of("value", "GHI-9012")))));
-	}
+    private static int countViolations(Validator validator, Object target) {
+        return validator.validate(target).size();
+    }
 
-	private static Map<String, Object> invalidDeepPayload() {
-		return Map.of(
-			"vendorExtensionCode", "ABC-1234",
-			"vendor", Map.of(
-				"contact", Map.of(
-					"codes", List.of(
-						Map.of("value", "ABC-1234"),
-						Map.of("value", "DEF-5678"),
-						Map.of("value", "ghi-9012")))));
-	}
+    private static ConfigurableApplicationContext startContext(String... properties) {
+        return new SpringApplicationBuilder(BenchmarkApplication.class)
+            .web(WebApplicationType.NONE)
+            .properties(properties)
+            .run();
+    }
 
-	private static void ensureResultsDirectoryExists() {
-		try {
-			Files.createDirectories(Path.of("target", "jmh-results"));
-		}
-		catch (IOException exception) {
-			throw new ExceptionInInitializerError(exception);
-		}
-	}
+    private static String[] baselineProperties() {
+        return new String[] {
+            "spring.config.name=validation-benchmark",
+            "spring.main.banner-mode=off",
+            "logging.level.root=ERROR",
+            "com.ampp.validation-enabled=true"
+        };
+    }
+
+    private static String[] validationOffProperties() {
+        return new String[] {
+            "spring.config.name=validation-benchmark",
+            "spring.main.banner-mode=off",
+            "logging.level.root=ERROR",
+            "com.ampp.validation-enabled=false"
+        };
+    }
+
+    private static String[] extensionProperties(String jsonPath) {
+        return new String[] {
+            "spring.config.name=validation-benchmark",
+            "spring.main.banner-mode=off",
+            "logging.level.root=ERROR",
+            "com.ampp.validation-enabled=true",
+            extensionProperty(0, MAP_REQUEST_CLASS_NAME, jsonPath),
+            "com.ampp.businessValidationOverride[0].fields[0].fieldName=" + EXTENSIONS_FIELD_NAME,
+            "com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions",
+            "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=" + jsonPath,
+            "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=" + CODE_REGEX,
+            extensionProperty(1, RAW_REQUEST_CLASS_NAME, jsonPath),
+            "com.ampp.businessValidationOverride[1].fields[0].fieldName=" + EXTENSIONS_FIELD_NAME,
+            "com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions",
+            "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=" + jsonPath,
+            "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=" + CODE_REGEX
+        };
+    }
+
+    private static String extensionProperty(int index, String className, String jsonPath) {
+        return "com.ampp.businessValidationOverride[" + index + "].fullClassName=" + className;
+    }
 }
