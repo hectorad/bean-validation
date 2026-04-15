@@ -19,6 +19,18 @@
 		<feign.version>13.6.1</feign.version>
 		<spring-cloud.version>2025.0.1</spring-cloud.version>
 		<spring-modulith.version>1.4.10</spring-modulith.version>
+		<jmh.version>1.37</jmh.version>
+		<jmh-maven-plugin.version>0.2.2</jmh-maven-plugin.version>
+		<jmh.bm>avgt</jmh.bm>
+		<jmh.tu>us</jmh.tu>
+		<jmh.f>2</jmh.f>
+		<jmh.w>1s</jmh.w>
+		<jmh.wi>5</jmh.wi>
+		<jmh.i>10</jmh.i>
+		<jmh.r>1s</jmh.r>
+		<jmh.rf>JSON</jmh.rf>
+		<jmh.rff>${project.build.directory}/jmh-results/extensions-validator.json</jmh.rff>
+		<jmh.benchmarks>ExtensionsValidatorBenchmark</jmh.benchmarks>
 	</properties>
 
 	<dependencyManagement>
@@ -91,6 +103,12 @@
 			<artifactId>spring-modulith-core</artifactId>
 			<scope>test</scope>
 		</dependency>
+		<dependency>
+			<groupId>org.openjdk.jmh</groupId>
+			<artifactId>jmh-core</artifactId>
+			<version>${jmh.version}</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 
 	<build>
@@ -98,6 +116,52 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+			</plugin>
+			<plugin>
+				<artifactId>maven-antrun-plugin</artifactId>
+				<version>3.1.0</version>
+				<executions>
+					<execution>
+						<id>create-jmh-results-directory</id>
+						<phase>process-test-resources</phase>
+						<goals>
+							<goal>run</goal>
+						</goals>
+						<configuration>
+							<target>
+								<mkdir dir="${project.build.directory}/jmh-results"/>
+							</target>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
+				<groupId>pw.krejci</groupId>
+				<artifactId>jmh-maven-plugin</artifactId>
+				<version>${jmh-maven-plugin.version}</version>
+				<configuration>
+					<annotationProcessorPaths>
+						<path>
+							<groupId>org.openjdk.jmh</groupId>
+							<artifactId>jmh-generator-annprocess</artifactId>
+							<version>${jmh.version}</version>
+						</path>
+					</annotationProcessorPaths>
+					<annotationProcessors>
+						<annotationProcessor>org.openjdk.jmh.generators.BenchmarkProcessor</annotationProcessor>
+					</annotationProcessors>
+					<benchmarkMode>${jmh.bm}</benchmarkMode>
+					<timeUnit>${jmh.tu}</timeUnit>
+					<fork>${jmh.f}</fork>
+					<warmup>${jmh.w}</warmup>
+					<warmupIterations>${jmh.wi}</warmupIterations>
+					<iterations>${jmh.i}</iterations>
+					<timeOnIteration>${jmh.r}</timeOnIteration>
+					<resultFormat>${jmh.rf}</resultFormat>
+					<resultsFile>${jmh.rff}</resultsFile>
+					<benchmarks>${jmh.benchmarks}</benchmarks>
+					<failOnError>true</failOnError>
+				</configuration>
 			</plugin>
 		</plugins>
 	</build>
