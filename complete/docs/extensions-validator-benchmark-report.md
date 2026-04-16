@@ -1,139 +1,148 @@
 # Extensions Validator Benchmark Report
 
-This report combines the latest isolated JMH results with short HTTP/Gatling runs against the dedicated perf endpoints.
+This report reflects a fresh extended rerun after the earlier results were likely affected by local machine activity. All timed scenarios in this rerun use valid payloads only. No invalid payload case was included in the measured JMH methods or the HTTP load-test scenarios.
+
+Run settings used for this report:
+
+- JMH: `1` fork, `1 x 30s` warmup iteration, `2 x 30s` measurement iterations, `21m21s` total suite time
+- Gatling: `30s` warmup, `300s` steady-state, `50 rps`, `16,500` requests per scenario
 
 Source data:
 
 - JMH JSON: [extensions-validator.json](/Users/hectorad/Developer/gs-validating-form-input/complete/target/jmh-results/extensions-validator.json)
-- Gatling off/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223007522/index.html)
-- Gatling off/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223024161/index.html)
-- Gatling shallow/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223110463/index.html)
-- Gatling shallow/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223128606/index.html)
-- Gatling deep/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223210016/index.html)
-- Gatling deep/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223231987/index.html)
+- Gatling off/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416102854786/index.html)
+- Gatling off/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416103435946/index.html)
+- Gatling shallow/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416104055865/index.html)
+- Gatling shallow/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416104636168/index.html)
+- Gatling deep/map: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416105240152/index.html)
+- Gatling deep/raw: [index.html](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416105820601/index.html)
 
-The old `POST /` form endpoint is not used here because it does not bind `extensions` JSON into the form object. All HTTP numbers below come from the dedicated perf endpoints:
+The old `POST /` form endpoint is intentionally not used here because it does not bind `extensions` JSON into the form object. All HTTP numbers below come from the dedicated perf endpoints:
 
 - `POST /perf/validate/extensions/map`
 - `POST /perf/validate/extensions/raw`
 
 ## Executive Summary
 
-- Turning validation off drops the isolated cost to about `0.146-0.149 us/op`, compared with `0.827-0.911 us/op` for baseline validation without any `Extensions` rule.
-- On the same deep payload, the shallow extension rule adds `0.444 us/op` on `Map<String,Object>` and `0.714 us/op` on raw JSON strings over baseline.
-- Switching from shallow JSONPath to deep JSONPath on the same deep body adds another `0.499 us/op` on `Map<String,Object>` and `0.491 us/op` on raw JSON.
-- Raw JSON adds a measurable parse penalty over matching map scenarios, topping out at `+0.314 us/op` when the shallow rule is run against the deep payload.
+- Validation-off is still the floor at about `0.145-0.152 us/op`.
+- Baseline Bean Validation without any `Extensions` rule lands around `0.769-0.903 us/op`.
+- On the same deep payload, the shallow extension rule adds `0.536 us/op` on `Map<String,Object>` and `0.648 us/op` on raw JSON over baseline.
+- Switching from the shallow JSONPath to the deep JSONPath on that same deep payload adds another `0.605 us/op` on `Map<String,Object>` and `0.450 us/op` on raw JSON.
+- Raw JSON is still slower than `Map<String,Object>` for the shallow-rule scenarios, but in this longer rerun the deep-rule raw-vs-map gap nearly disappears at `+0.003 us/op`.
 
-The isolated JMH numbers make the main story clear: validation-off vs baseline is a large fixed cost, raw JSON adds parsing overhead, and deep traversal is more expensive than the shallow rule on the same body. The short HTTP runs confirm the dedicated endpoints work under load with `0%` errors, but they are much noisier than JMH and should be treated as end-to-end sanity checks rather than the source of micro-cost truth.
+The isolated JMH numbers are still the main source of truth for validator cost. The longer HTTP runs are useful because they show the request path stayed stable for more than five minutes per scenario, but at `50 rps` the full-stack latency differences mostly collapse into the same `1-3 ms` band.
 
 ## JMH Absolute Cost
 
-Deep payload, same body across modes:
+Deep payload, same body across validation modes:
 
 ```mermaid
 xychart-beta
-    title "JMH absolute cost on deep payload"
+    title "JMH absolute cost on deep payload (30s warmup, 2 x 30s measure)"
     x-axis ["Off","Baseline","Shallow path","Deep path"]
-    y-axis "us/op" 0 --> 2.3
-    bar "Map" [0.147, 0.867, 1.311, 1.810]
-    bar "Raw JSON" [0.146, 0.911, 1.625, 2.116]
+    y-axis "us/op" 0 --> 2.1
+    bar "Map" [0.145, 0.769, 1.305, 1.910]
+    bar "Raw JSON" [0.145, 0.814, 1.462, 1.912]
 ```
 
 Shallow payload:
 
 ```mermaid
 xychart-beta
-    title "JMH absolute cost on shallow payload"
+    title "JMH absolute cost on shallow payload (30s warmup, 2 x 30s measure)"
     x-axis ["Off","Baseline","Shallow path"]
-    y-axis "us/op" 0 --> 1.5
-    bar "Map" [0.149, 0.827, 1.232]
-    bar "Raw JSON" [0.148, 0.890, 1.356]
+    y-axis "us/op" 0 --> 1.6
+    bar "Map" [0.152, 0.866, 1.297]
+    bar "Raw JSON" [0.147, 0.903, 1.425]
 ```
 
-| Scenario | Avg (`us/op`) | Error (`us/op`) |
-| --- | ---: | ---: |
-| `off_map_shallow_payload` | `0.149` | `0.002` |
-| `off_map_deep_payload` | `0.147` | `0.002` |
-| `baseline_map_shallow_payload` | `0.827` | `0.028` |
-| `baseline_map_deep_payload` | `0.867` | `0.020` |
-| `shallow_path_on_map_shallow_payload` | `1.232` | `0.041` |
-| `shallow_path_on_map_deep_payload` | `1.311` | `0.015` |
-| `deep_path_on_map_deep_payload` | `1.810` | `0.090` |
-| `off_json_shallow_payload` | `0.148` | `0.003` |
-| `off_json_deep_payload` | `0.146` | `0.002` |
-| `baseline_json_shallow_payload` | `0.890` | `0.016` |
-| `baseline_json_deep_payload` | `0.911` | `0.010` |
-| `shallow_path_on_json_shallow_payload` | `1.356` | `0.049` |
-| `shallow_path_on_json_deep_payload` | `1.625` | `0.053` |
-| `deep_path_on_json_deep_payload` | `2.116` | `0.056` |
+| Scenario | Avg (`us/op`) |
+| --- | ---: |
+| `off_map_shallow_payload` | `0.152` |
+| `off_map_deep_payload` | `0.145` |
+| `baseline_map_shallow_payload` | `0.866` |
+| `baseline_map_deep_payload` | `0.769` |
+| `shallow_path_on_map_shallow_payload` | `1.297` |
+| `shallow_path_on_map_deep_payload` | `1.305` |
+| `deep_path_on_map_deep_payload` | `1.910` |
+| `off_json_shallow_payload` | `0.147` |
+| `off_json_deep_payload` | `0.145` |
+| `baseline_json_shallow_payload` | `0.903` |
+| `baseline_json_deep_payload` | `0.814` |
+| `shallow_path_on_json_shallow_payload` | `1.425` |
+| `shallow_path_on_json_deep_payload` | `1.462` |
+| `deep_path_on_json_deep_payload` | `1.912` |
 
 ## JMH Delta View
 
-Non-extension validation cost:
+Validation-on vs validation-off:
 
 | Comparison | Formula | Added cost (`us/op`) | Increase |
 | --- | --- | ---: | ---: |
-| Map shallow baseline vs off | `0.827 - 0.149` | `0.678` | `455.0%` |
-| Map deep baseline vs off | `0.867 - 0.147` | `0.720` | `489.8%` |
-| Raw shallow baseline vs off | `0.890 - 0.148` | `0.742` | `501.4%` |
-| Raw deep baseline vs off | `0.911 - 0.146` | `0.765` | `524.0%` |
+| Map shallow baseline vs off | `0.866 - 0.152` | `0.714` | `470.2%` |
+| Map deep baseline vs off | `0.769 - 0.145` | `0.624` | `429.6%` |
+| Raw shallow baseline vs off | `0.903 - 0.147` | `0.756` | `514.5%` |
+| Raw deep baseline vs off | `0.814 - 0.145` | `0.670` | `463.4%` |
 
-Extension overhead:
-
-| Comparison | Formula | Added cost (`us/op`) | Increase |
-| --- | --- | ---: | ---: |
-| Map shallow rule on shallow payload | `1.232 - 0.827` | `0.405` | `49.0%` |
-| Map shallow rule on deep payload | `1.311 - 0.867` | `0.444` | `51.2%` |
-| Map deep traversal on deep payload | `1.810 - 1.311` | `0.499` | `38.1%` |
-| Raw shallow rule on shallow payload | `1.356 - 0.890` | `0.466` | `52.4%` |
-| Raw shallow rule on deep payload | `1.625 - 0.911` | `0.714` | `78.4%` |
-| Raw deep traversal on deep payload | `2.116 - 1.625` | `0.491` | `30.2%` |
-
-Raw JSON parse overhead vs matching map scenario:
+Extension-rule overhead:
 
 | Comparison | Formula | Added cost (`us/op`) | Increase |
 | --- | --- | ---: | ---: |
-| Baseline shallow raw vs map | `0.890 - 0.827` | `0.063` | `7.6%` |
-| Baseline deep raw vs map | `0.911 - 0.867` | `0.044` | `5.1%` |
-| Shallow rule on shallow payload raw vs map | `1.356 - 1.232` | `0.124` | `10.1%` |
-| Shallow rule on deep payload raw vs map | `1.625 - 1.311` | `0.314` | `24.0%` |
-| Deep rule on deep payload raw vs map | `2.116 - 1.810` | `0.306` | `16.9%` |
+| Map shallow rule on shallow payload | `1.297 - 0.866` | `0.431` | `49.8%` |
+| Map shallow rule on deep payload | `1.305 - 0.769` | `0.536` | `69.7%` |
+| Map deep traversal on deep payload | `1.910 - 1.305` | `0.605` | `46.4%` |
+| Raw shallow rule on shallow payload | `1.425 - 0.903` | `0.522` | `57.8%` |
+| Raw shallow rule on deep payload | `1.462 - 0.814` | `0.648` | `79.6%` |
+| Raw deep traversal on deep payload | `1.912 - 1.462` | `0.450` | `30.8%` |
+
+Raw JSON vs `Map<String,Object>` on the same scenario:
+
+| Comparison | Formula | Added cost (`us/op`) | Increase |
+| --- | --- | ---: | ---: |
+| Baseline shallow raw vs map | `0.903 - 0.866` | `0.037` | `4.3%` |
+| Baseline deep raw vs map | `0.814 - 0.769` | `0.045` | `5.9%` |
+| Shallow rule on shallow payload raw vs map | `1.425 - 1.297` | `0.128` | `9.8%` |
+| Shallow rule on deep payload raw vs map | `1.462 - 1.305` | `0.157` | `12.1%` |
+| Deep rule on deep payload raw vs map | `1.912 - 1.910` | `0.003` | `0.1%` |
+
+Important note: the two baseline raw-vs-map rows are still not pure parse-cost measurements, because the raw JSON parse path is only exercised when an `Extensions` rule is active. The stronger raw-vs-map signal is in the extension-enabled rows.
 
 ## HTTP / Gatling
 
-These Gatling numbers come from short `50 rps`, `2s warmup`, `5s duration` runs on the same deep payload. They are useful as end-to-end smoke results, but they are much noisier than JMH because they include HTTP, Tomcat, Jackson request-body binding, and normal runtime jitter.
+These Gatling numbers come from long `50 rps`, `30s warmup`, `300s duration` runs on the deep payload. Each scenario completed `16,500` requests with `0%` errors, so this section is useful as a request-path stability check over a much longer window than the earlier short run.
 
 ```mermaid
 xychart-beta
-    title "HTTP p95 latency from short Gatling runs"
+    title "HTTP latency from 30s warmup + 5m sustained run"
     x-axis ["Off map","Shallow map","Deep map","Off raw","Shallow raw","Deep raw"]
-    y-axis "p95 ms" 0 --> 230
-    bar [5, 222, 18, 4, 4, 4]
+    y-axis "ms" 0 --> 5
+    bar "Mean" [2, 2, 2, 1, 2, 2]
+    bar "p95" [3, 3, 3, 3, 3, 3]
 ```
 
-| Mode | Endpoint | Payload | Mean (`ms`) | p50 (`ms`) | p95 (`ms`) | Throughput (`rps`) | Error rate | Artifact |
-| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
-| `off` | `/perf/validate/extensions/map` | `deep` | `10` | `3` | `5` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223007522/index.html) |
-| `off` | `/perf/validate/extensions/raw` | `deep` | `7` | `3` | `4` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223024161/index.html) |
-| `shallow` | `/perf/validate/extensions/map` | `deep` | `26` | `3` | `222` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223110463/index.html) |
-| `shallow` | `/perf/validate/extensions/raw` | `deep` | `7` | `3` | `4` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223128606/index.html) |
-| `deep` | `/perf/validate/extensions/map` | `deep` | `12` | `3` | `18` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223210016/index.html) |
-| `deep` | `/perf/validate/extensions/raw` | `deep` | `7` | `3` | `4` | `50` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260415223231987/index.html) |
+| Mode | Endpoint | Payload | Mean (`ms`) | p50 (`ms`) | p75 (`ms`) | p95 (`ms`) | p99 (`ms`) | Max (`ms`) | Throughput (`rps`) | Requests | Error rate | Artifact |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| `off` | `/perf/validate/extensions/map` | `deep` | `2` | `2` | `2` | `3` | `4` | `376` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416102854786/index.html) |
+| `off` | `/perf/validate/extensions/raw` | `deep` | `1` | `1` | `2` | `3` | `3` | `225` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416103435946/index.html) |
+| `shallow` | `/perf/validate/extensions/map` | `deep` | `2` | `1` | `2` | `3` | `4` | `348` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416104055865/index.html) |
+| `shallow` | `/perf/validate/extensions/raw` | `deep` | `2` | `1` | `2` | `3` | `4` | `237` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416104636168/index.html) |
+| `deep` | `/perf/validate/extensions/map` | `deep` | `2` | `1` | `2` | `3` | `4` | `435` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416105240152/index.html) |
+| `deep` | `/perf/validate/extensions/raw` | `deep` | `2` | `1` | `2` | `3` | `3` | `254` | `50` | `16,500` | `0.0%` | [report](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/formvalidationsimulation-20260416105820601/index.html) |
 
 ## Interpretation
 
-The JMH side is the reliable signal:
+The longer JMH rerun gives the clearest answer:
 
-- validation-off establishes the floor at roughly `0.15 us/op`
-- baseline validation adds about `0.68-0.77 us/op`
-- the shallow `Extensions` rule adds about `0.41-0.71 us/op`
-- deep traversal adds another `0.49-0.50 us/op` on the same deep body
-- raw JSON parsing adds another `0.04-0.31 us/op` depending on the scenario
+- turning validation off drops the steady-state cost to roughly `0.15 us/op`
+- baseline Bean Validation adds about `0.62-0.76 us/op`
+- adding the shallow `Extensions` rule adds another `0.43-0.65 us/op`
+- moving from the shallow JSONPath to the deep wildcard JSONPath adds another `0.45-0.61 us/op` on the same deep body
+- raw JSON remains slower on the shallow-rule path, but the deep-rule raw-vs-map gap is effectively flat in this rerun
 
-The HTTP numbers are still useful, but they answer a different question:
+The longer HTTP runs answer a different question:
 
-- do the dedicated endpoints work under load?
-- does each mode stay error-free?
-- is there any obvious request-path regression large enough to show up above framework noise?
+- do the dedicated perf endpoints stay stable for a meaningful runtime?
+- do off, shallow, and deep modes stay error-free under sustained load?
+- does request-path latency separate cleanly enough to attribute a visible end-to-end regression?
 
-For this short run, all six HTTP scenarios stayed at `0%` errors and held the configured `50 rps`. The map path shows more visible latency variance than the raw path in these short samples, especially the shallow-map run, which is a reminder that end-to-end latency can be dominated by occasional framework or JVM outliers rather than the validator’s micro-cost alone.
+For this extended run, all six HTTP scenarios held `50 rps`, completed `16,500` requests each, and stayed at `0%` errors. Their p95 converged to `3 ms` across every scenario, which means the validator’s micro-cost is still better read from JMH than from end-to-end HTTP latency at this load level on this machine.

@@ -1,4 +1,6 @@
 com.ampp:
+  perf-endpoints:
+    enabled: true
   businessValidationOverride:
     - fullClassName: com.example.validatingforminput.PersonForm
       fields:
@@ -40,6 +42,15 @@ com.ampp:
               params:
                 value: 250000.00
               message: Salary must be at most 250000.00
+        - fieldName: extensions
+          constraints:
+            - constraintType: Extensions
+              params:
+                jsonPath: $.vendor.contact.codes[*].value
+                regexp: "^[A-Z]{3}-[0-9]{4}$"
+              message: Nested vendor extension code format is invalid
+    - fullClassName: com.example.validatingforminput.perf.PerfMapValidationRequest
+      fields:
         - fieldName: extensions
           constraints:
             - constraintType: Extensions
