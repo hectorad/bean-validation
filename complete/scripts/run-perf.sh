@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 #
-# Run the Gatling FormValidationSimulation against the app in each of the
-# three A/B/C Spring profiles, producing one Gatling HTML report per leg.
+# Run the Gatling FormValidationSimulation against the app in a six-leg
+# matrix: off/shallow/deep Spring profiles x map/raw body modes, always using
+# the same deep shopping-cart payload.
 #
 # Usage:
 #   scripts/run-perf.sh [rps] [duration_seconds] [warmup_seconds]
@@ -9,7 +10,7 @@
 # Defaults: rps=100, duration=120, warmup=30.
 #
 # Output:
-#   target/gatling/<profile>-<timestamp>/index.html   (per leg)
+#   target/gatling/<profile>-<bodyMode>-deep-<timestamp>/index.html   (per leg)
 #
 # Requires: Java 21, Maven wrapper, and a free port 8080.
 
@@ -23,11 +24,14 @@ PORT="${PORT:-8080}"
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-# profile:payloadShape pairs
+# profile:bodyMode pairs
 LEGS=(
-  "ext-off:shallow"
-  "ext-on-shallow:shallow"
-  "ext-on-deep:deep"
+  "ext-off:map"
+  "ext-on-shallow:map"
+  "ext-on-deep:map"
+  "ext-off:raw"
+  "ext-on-shallow:raw"
+  "ext-on-deep:raw"
 )
 
 echo "==> Packaging application (skipping tests)"
@@ -43,13 +47,14 @@ mkdir -p target/gatling-runs
 
 for leg in "${LEGS[@]}"; do
   PROFILE="${leg%%:*}"
-  SHAPE="${leg##*:}"
+  BODY_MODE="${leg##*:}"
+  SHAPE="deep"
   STAMP="$(date +%Y%m%d-%H%M%S)"
 
-  LOG="target/gatling-runs/app-${PROFILE}-${STAMP}.log"
+  LOG="target/gatling-runs/app-${PROFILE}-${BODY_MODE}-${SHAPE}-${STAMP}.log"
 
   echo
-  echo "==> [${PROFILE}] starting app on :${PORT} (shape=${SHAPE})"
+  echo "==> [${PROFILE}/${BODY_MODE}] starting app on :${PORT} (shape=${SHAPE})"
   java -Dspring.profiles.active="${PROFILE}" \
        -Dserver.port="${PORT}" \
        -jar "${JAR}" \
@@ -71,25 +76,26 @@ for leg in "${LEGS[@]}"; do
     sleep 1
   done
 
-  echo "==> [${PROFILE}] running Gatling: rps=${RPS} duration=${DURATION}s warmup=${WARMUP}s shape=${SHAPE}"
+  echo "==> [${PROFILE}/${BODY_MODE}] running Gatling: rps=${RPS} duration=${DURATION}s warmup=${WARMUP}s bodyMode=${BODY_MODE} shape=${SHAPE}"
   ./mvnw -q -Pperformance gatling:test \
       -DbaseUrl="http://localhost:${PORT}" \
       -Drps="${RPS}" \
       -Dduration="${DURATION}" \
       -Dwarmup="${WARMUP}" \
+      -DbodyMode="${BODY_MODE}" \
       -DpayloadShape="${SHAPE}" \
-      -Drun.label="${PROFILE}" \
-    || { echo "Gatling failed for ${PROFILE}"; kill "${APP_PID}" 2>/dev/null || true; exit 1; }
+      -Drun.label="${PROFILE}-${BODY_MODE}-${SHAPE}" \
+    || { echo "Gatling failed for ${PROFILE}/${BODY_MODE}"; kill "${APP_PID}" 2>/dev/null || true; exit 1; }
 
   # Move the just-generated report aside so the next leg does not overwrite it.
   LATEST_REPORT="$(ls -td target/gatling/formvalidationsimulation-* 2>/dev/null | head -n 1 || true)"
   if [[ -n "${LATEST_REPORT}" ]]; then
-    DEST="target/gatling/${PROFILE}-${STAMP}"
+    DEST="target/gatling/${PROFILE}-${BODY_MODE}-${SHAPE}-${STAMP}"
     mv "${LATEST_REPORT}" "${DEST}"
     echo "    report: ${DEST}/index.html"
   fi
 
-  echo "==> [${PROFILE}] stopping app (pid=${APP_PID})"
+  echo "==> [${PROFILE}/${BODY_MODE}] stopping app (pid=${APP_PID})"
   kill "${APP_PID}" 2>/dev/null || true
   wait "${APP_PID}" 2>/dev/null || true
 done

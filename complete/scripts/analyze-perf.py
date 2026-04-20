@@ -1,20 +1,20 @@
 #!/usr/bin/env python3
 """
-Analyze Gatling runs produced by scripts/run-perf.sh and emit:
+Analyze Gatling runs produced by scripts/run-perf.sh and emit separate
+comparison artifacts for map and raw body modes:
 
-  - target/gatling/comparison.png   grouped bar chart + throughput chart
-  - target/gatling/comparison.md    markdown summary suitable for email
+  - target/gatling/comparison-map.png
+  - target/gatling/comparison-map.md
+  - target/gatling/comparison-raw.png
+  - target/gatling/comparison-raw.md
 
 Parses the top-level `stats` object inside each run's js/stats.js.
-Runs are detected by directory prefix under target/gatling/:
-    ext-off-*, ext-on-shallow-*, ext-on-deep-*
-The most recent dir per prefix wins.
+Runs are detected by exact directory prefix under target/gatling/ and the most
+recent dir per prefix wins.
 """
 from __future__ import annotations
 
-import glob
 import json
-import os
 import re
 import sys
 from dataclasses import dataclass
@@ -27,6 +27,18 @@ ROOT = Path(__file__).resolve().parent.parent
 GATLING_DIR = ROOT / "target" / "gatling"
 
 RUN_ORDER = ["ext-off", "ext-on-shallow", "ext-on-deep"]
+RUN_GROUPS = {
+    "map": [
+        "ext-off-map-deep",
+        "ext-on-shallow-map-deep",
+        "ext-on-deep-map-deep",
+    ],
+    "raw": [
+        "ext-off-raw-deep",
+        "ext-on-shallow-raw-deep",
+        "ext-on-deep-raw-deep",
+    ],
+}
 RUN_LABELS = {
     "ext-off":         "Extensions OFF\n(baseline)",
     "ext-on-shallow":  "Extensions ON\n(shallow JSONPath)",
@@ -42,6 +54,7 @@ RUN_COLORS = {
 @dataclass
 class RunStats:
     label: str
+    prefix: str
     dir: Path
     total: int
     ok: int
@@ -90,7 +103,8 @@ def parse_run(prefix: str) -> RunStats | None:
         return float(s[key]["total"])
 
     return RunStats(
-        label=prefix,
+        label=prefix.split("-map-")[0].split("-raw-")[0],
+        prefix=prefix,
         dir=run_dir,
         total=int(s["numberOfRequests"]["total"]),
         ok=int(s["numberOfRequests"]["ok"]),
@@ -107,7 +121,7 @@ def parse_run(prefix: str) -> RunStats | None:
     )
 
 
-def render_chart(runs: list[RunStats], out_path: Path) -> None:
+def render_chart(runs: list[RunStats], out_path: Path, mode: str) -> None:
     # 3-panel layout: (1) steady-state percentiles zoomed, (2) outlier Max
     # broken out so it doesn't crush the scale, (3) throughput.
     fig = plt.figure(figsize=(15, 6))
@@ -117,7 +131,7 @@ def render_chart(runs: list[RunStats], out_path: Path) -> None:
     ax_rps = fig.add_subplot(gs[0, 2])
 
     fig.suptitle(
-        "Extension Constraint Validator — Performance Impact",
+        f"Extension Constraint Validator — HTTP Impact ({mode.upper()})",
         fontsize=15, fontweight="bold",
     )
 
@@ -209,7 +223,7 @@ def render_chart(runs: list[RunStats], out_path: Path) -> None:
     print(f"wrote {out_path}")
 
 
-def render_markdown(runs: list[RunStats], chart_path: Path, out_path: Path) -> None:
+def render_markdown(runs: list[RunStats], chart_path: Path, out_path: Path, mode: str) -> None:
     def row(attr, label, unit=""):
         cells = [label] + [f"{getattr(r, attr):.0f}{unit}" for r in runs]
         return "| " + " | ".join(cells) + " |"
@@ -231,7 +245,7 @@ def render_markdown(runs: list[RunStats], chart_path: Path, out_path: Path) -> N
     header = ["Metric"] + [RUN_LABELS[r.label].replace("\n", " ") for r in runs]
 
     md = [
-        "# Extension Constraint Validator — Performance Impact",
+        f"# Extension Constraint Validator — HTTP Impact ({mode.upper()})",
         "",
         f"![comparison]({chart_path.name})",
         "",
@@ -267,34 +281,41 @@ def render_markdown(runs: list[RunStats], chart_path: Path, out_path: Path) -> N
         "the shopping cart item list with an array wildcard (`$.items[*].productOffering.tags.catalogCode`).",
         "- 0 KO across all runs confirms the comparison is on the validation-pass path.",
         "",
-        "_Source reports_: `target/gatling/ext-off-*`, "
-        "`target/gatling/ext-on-shallow-*`, `target/gatling/ext-on-deep-*`.",
+        "## Source reports",
+        "",
+        f"- [`{runs[0].dir.name}`]({runs[0].dir.name}/index.html)",
+        f"- [`{runs[1].dir.name}`]({runs[1].dir.name}/index.html)",
+        f"- [`{runs[2].dir.name}`]({runs[2].dir.name}/index.html)",
     ]
     out_path.write_text("\n".join(md))
     print(f"wrote {out_path}")
 
 
 def main() -> int:
-    runs: list[RunStats] = []
-    for prefix in RUN_ORDER:
-        r = parse_run(prefix)
-        if r is None:
-            print(f"missing run: {prefix}", file=sys.stderr)
-            return 1
-        runs.append(r)
+    for mode, prefixes in RUN_GROUPS.items():
+        runs: list[RunStats] = []
+        for prefix in prefixes:
+            r = parse_run(prefix)
+            if r is None:
+                print(f"missing run: {prefix}", file=sys.stderr)
+                return 1
+            runs.append(r)
 
-    for r in runs:
-        print(
-            f"{r.label:18}  total={r.total:>6}  ok={r.ok:>6}  ko={r.ko:>4}  "
-            f"rps={r.rps:6.1f}  mean={r.mean_ms:5.1f}ms  "
-            f"p50={r.p50_ms:5.1f}  p95={r.p95_ms:5.1f}  p99={r.p99_ms:5.1f}  "
-            f"max={r.max_ms:6.1f}"
-        )
+        print(f"== {mode.upper()} ==")
+        for r in runs:
+            print(
+                f"{r.prefix:28}  total={r.total:>6}  ok={r.ok:>6}  ko={r.ko:>4}  "
+                f"rps={r.rps:6.1f}  mean={r.mean_ms:5.1f}ms  "
+                f"p50={r.p50_ms:5.1f}  p95={r.p95_ms:5.1f}  p99={r.p99_ms:5.1f}  "
+                f"max={r.max_ms:6.1f}"
+            )
 
-    chart_path = GATLING_DIR / "comparison.png"
-    md_path = GATLING_DIR / "comparison.md"
-    render_chart(runs, chart_path)
-    render_markdown(runs, chart_path, md_path)
+        chart_path = GATLING_DIR / f"comparison-{mode}.png"
+        md_path = GATLING_DIR / f"comparison-{mode}.md"
+        render_chart(runs, chart_path, mode)
+        render_markdown(runs, chart_path, md_path, mode)
+        print()
+
     return 0
 
 

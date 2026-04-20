@@ -142,7 +142,7 @@ noglob java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
 
 ### Run Gatling
 
-Example:
+Single-run example:
 
 ```bash
 ./mvnw -Pperformance gatling:test \
@@ -153,7 +153,7 @@ Example:
   -Drun.label=deep-map-deep
 ```
 
-The most useful HTTP comparison set is the same deep payload across all three modes:
+The recommended HTTP comparison set is the same deep payload across all three modes:
 
 - `off/map`
 - `off/raw`
@@ -162,7 +162,30 @@ The most useful HTTP comparison set is the same deep payload across all three mo
 - `deep/map`
 - `deep/raw`
 
-Use `payloadShape=deep` for those runs so the shallow and deep validators inspect the same body.
+Use `payloadShape=deep` for those runs so the shallow and deep validators inspect the same shopping-cart body.
+
+### Helper script
+
+Run the full six-leg deep-payload HTTP matrix and generate comparison artifacts:
+
+```bash
+scripts/run-perf.sh 50 300 30
+python3 scripts/analyze-perf.py
+```
+
+`scripts/run-perf.sh` now:
+
+- runs all three profiles for `map`
+- runs all three profiles for `raw`
+- forces `payloadShape=deep` for every scenario
+- stores report directories under names like `ext-on-deep-raw-deep-<timestamp>`
+
+`scripts/analyze-perf.py` now generates:
+
+- [comparison-map.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.md)
+- [comparison-map.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.png)
+- [comparison-raw.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.md)
+- [comparison-raw.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.png)
 
 The measured model under test is a shopping-cart-shaped payload carried inside the `extensions` field. The wrapper request body around it now uses cart-domain baseline fields such as `cartId`, `customerId`, `currency`, and `totalAmount`.
 

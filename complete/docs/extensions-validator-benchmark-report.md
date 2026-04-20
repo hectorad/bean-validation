@@ -12,10 +12,15 @@ All timed JMH scenarios in this report use valid payloads only. Invalid payloads
 Run settings used for this report:
 
 - JMH: `2` forks, `5 x 1s` warmup iterations, `10 x 1s` measurement iterations, average time in microseconds
+- Gatling: `30s` warmup, `300s` steady-state, `50 rps`, deep shopping-cart payload only, six HTTP runs (`off/shallow/deep` x `map/raw`)
 
 Source data:
 
 - JMH JSON: [extensions-validator.json](/Users/hectorad/Developer/gs-validating-form-input/complete/target/jmh-results/extensions-validator.json)
+- Gatling map summary: [comparison-map.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.md)
+- Gatling map chart: [comparison-map.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.png)
+- Gatling raw summary: [comparison-raw.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.md)
+- Gatling raw chart: [comparison-raw.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.png)
 
 ## Model under test
 
@@ -140,11 +145,87 @@ The most direct comparisons are:
 
 ## HTTP / Gatling Harness
 
-The HTTP perf path is already updated to the shopping-cart model:
+The HTTP perf path is now measured on the same deep shopping-cart payload across all three validator modes and both body representations:
 
 - `POST /perf/validate/extensions/map`
 - `POST /perf/validate/extensions/raw`
-- `FormValidationSimulation` now builds shopping-cart request bodies from `PerfPayloadFixtures`
+- all six runs use the valid deep shopping-cart body, so only validator mode and body representation change
 - the shallow/deep rules use `$.cartCode` and `$.items[*].productOffering.tags.catalogCode`
+- the old `POST /` form endpoint is still excluded, because it does not bind an `extensions` JSON payload into the validated model
 
-I intentionally did not carry forward the older vendor/contact HTTP latency tables into this report. Those runs were taken before the shopping-cart model swap, so keeping them here would mix stale end-to-end numbers with the new JMH model. When the HTTP matrix is rerun, this report can add a fresh p50/p95/throughput section for the shopping-cart payloads too.
+Fresh report artifacts from this rerun:
+
+- map summary: [comparison-map.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.md)
+- map chart: [comparison-map.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-map.png)
+- raw summary: [comparison-raw.md](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.md)
+- raw chart: [comparison-raw.png](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/comparison-raw.png)
+
+### Map Body (`/perf/validate/extensions/map`)
+
+All three map runs completed `16,500` requests with `0` failures and sustained `50 rps`.
+
+| Metric | Off | Shallow | Deep |
+| --- | ---: | ---: | ---: |
+| Mean latency | `1 ms` | `1 ms` | `1 ms` |
+| p50 | `1 ms` | `1 ms` | `1 ms` |
+| p95 | `2 ms` | `2 ms` | `2 ms` |
+| p99 | `3 ms` | `3 ms` | `3 ms` |
+| Max | `258 ms` | `281 ms` | `278 ms` |
+
+Map deltas:
+
+| Comparison | Mean | p95 | p99 | Max |
+| --- | ---: | ---: | ---: | ---: |
+| `off -> shallow` | `+0 ms` | `+0 ms` | `+0 ms` | `+23 ms` |
+| `shallow -> deep` | `+0 ms` | `+0 ms` | `+0 ms` | `-3 ms` |
+| `off -> deep` | `+0 ms` | `+0 ms` | `+0 ms` | `+20 ms` |
+
+Takeaway: at the HTTP layer the map-mode validator cost is below the observable steady-state latency floor for this run. Throughput, mean latency, and steady-state percentiles were identical across `off`, `shallow`, and `deep`; only single-request max outliers moved, which is consistent with normal runtime noise rather than validator work.
+
+Source reports:
+
+- [ext-off-map-deep-20260420-134635](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-off-map-deep-20260420-134635/index.html)
+- [ext-on-shallow-map-deep-20260420-135216](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-on-shallow-map-deep-20260420-135216/index.html)
+- [ext-on-deep-map-deep-20260420-135757](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-on-deep-map-deep-20260420-135757/index.html)
+
+### Raw JSON Body (`/perf/validate/extensions/raw`)
+
+All three raw runs completed `16,500` requests with `0` failures and sustained `50 rps`.
+
+| Metric | Off | Shallow | Deep |
+| --- | ---: | ---: | ---: |
+| Mean latency | `1 ms` | `1 ms` | `1 ms` |
+| p50 | `1 ms` | `1 ms` | `1 ms` |
+| p95 | `2 ms` | `3 ms` | `2 ms` |
+| p99 | `4 ms` | `4 ms` | `3 ms` |
+| Max | `265 ms` | `267 ms` | `281 ms` |
+
+Raw deltas:
+
+| Comparison | Mean | p95 | p99 | Max |
+| --- | ---: | ---: | ---: | ---: |
+| `off -> shallow` | `+0 ms` | `+1 ms` | `+0 ms` | `+2 ms` |
+| `shallow -> deep` | `+0 ms` | `-1 ms` | `-1 ms` | `+14 ms` |
+| `off -> deep` | `+0 ms` | `+0 ms` | `-1 ms` | `+16 ms` |
+
+Takeaway: raw mode is also effectively flat at this HTTP load level. The only visible percentile movement is a `+1 ms` p95 bump in `off -> shallow`, but the deep run returns to the same `2 ms` p95 as `off`, so the end-to-end signal is still dominated by network/server jitter rather than the extension validator itself.
+
+Source reports:
+
+- [ext-off-raw-deep-20260420-140338](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-off-raw-deep-20260420-140338/index.html)
+- [ext-on-shallow-raw-deep-20260420-140919](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-on-shallow-raw-deep-20260420-140919/index.html)
+- [ext-on-deep-raw-deep-20260420-141500](/Users/hectorad/Developer/gs-validating-form-input/complete/target/gatling/ext-on-deep-raw-deep-20260420-141500/index.html)
+
+### HTTP Interpretation
+
+The long HTTP rerun is useful as a realism check:
+
+- all six scenarios sustained `50 rps`
+- all six scenarios returned `0%` errors
+- the validator mode changes did not materially move mean latency or throughput
+- the validator overhead is still much clearer in JMH than in end-to-end HTTP latency, which is expected at this scale
+
+So the combined picture is:
+
+- JMH is the right tool for isolating extension-validator overhead
+- Gatling confirms that, under this deep shopping-cart request load, enabling the validator does not create an obvious end-to-end regression at `50 rps`
