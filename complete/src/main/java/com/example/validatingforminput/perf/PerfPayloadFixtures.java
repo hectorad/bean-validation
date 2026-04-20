@@ -4,22 +4,39 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 public final class PerfPayloadFixtures {
 
-    private static final String VALID_NAME = "Robert";
-    private static final Integer VALID_AGE = 30;
-    private static final BigDecimal VALID_SALARY = new BigDecimal("2000.00");
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+        .setSerializationInclusion(JsonInclude.Include.NON_NULL);
+    private static final TypeReference<Map<String, Object>> MAP_TYPE = new TypeReference<>() {
+    };
 
-    private static final String SHALLOW_EXTENSIONS_JSON = "{\"vendorExtensionCode\":\"ABC-1234\"}";
-    private static final String INVALID_SHALLOW_EXTENSIONS_JSON = "{\"vendorExtensionCode\":\"abc-1234\"}";
+    private static final String VALID_CART_ID = "CART-7F9A21";
+    private static final String VALID_CUSTOMER_ID = "CUSTOMER-1001";
+    private static final String VALID_CURRENCY = "USD";
+    private static final BigDecimal VALID_TOTAL_AMOUNT = new BigDecimal("1499.99");
 
-    private static final String DEEP_EXTENSIONS_JSON = """
-        {"vendorExtensionCode":"ABC-1234","vendor":{"contact":{"codes":[{"value":"ABC-1234"},{"value":"DEF-5678"},{"value":"GHI-9012"}]}}}
-        """.trim();
+    private static final ShoppingCartPayload SHALLOW_CART = new ShoppingCartPayload("ABC-1234", null);
+    private static final ShoppingCartPayload INVALID_SHALLOW_CART = new ShoppingCartPayload("abc-1234", null);
 
-    private static final String INVALID_DEEP_EXTENSIONS_JSON = """
-        {"vendorExtensionCode":"ABC-1234","vendor":{"contact":{"codes":[{"value":"ABC-1234"},{"value":"DEF-5678"},{"value":"ghi-9012"}]}}}
-        """.trim();
+    private static final ShoppingCartPayload DEEP_CART = new ShoppingCartPayload(
+        "ABC-1234",
+        List.of(
+            itemWithCode("Fiber 500", "ABC-1234"),
+            itemWithCode("Fiber 800", "DEF-5678"),
+            itemWithCode("Fiber 1000", "GHI-9012")));
+
+    private static final ShoppingCartPayload INVALID_DEEP_CART = new ShoppingCartPayload(
+        "ABC-1234",
+        List.of(
+            itemWithCode("Fiber 500", "ABC-1234"),
+            itemWithCode("Fiber 800", "DEF-5678"),
+            itemWithCode("Fiber 1000", "ghi-9012")));
 
     private static final String MALFORMED_EXTENSIONS_JSON = "{ not-json";
 
@@ -43,19 +60,19 @@ public final class PerfPayloadFixtures {
     }
 
     public static PerfRawValidationRequest shallowRawRequest() {
-        return rawRequest(SHALLOW_EXTENSIONS_JSON);
+        return rawRequest(shallowExtensionsJson());
     }
 
     public static PerfRawValidationRequest deepRawRequest() {
-        return rawRequest(DEEP_EXTENSIONS_JSON);
+        return rawRequest(deepExtensionsJson());
     }
 
     public static PerfRawValidationRequest invalidShallowRawRequest() {
-        return rawRequest(INVALID_SHALLOW_EXTENSIONS_JSON);
+        return rawRequest(invalidShallowExtensionsJson());
     }
 
     public static PerfRawValidationRequest invalidDeepRawRequest() {
-        return rawRequest(INVALID_DEEP_EXTENSIONS_JSON);
+        return rawRequest(invalidDeepExtensionsJson());
     }
 
     public static PerfRawValidationRequest malformedRawRequest() {
@@ -63,52 +80,23 @@ public final class PerfPayloadFixtures {
     }
 
     public static String mapRequestBody(String shape) {
-        String extensionsJson = "deep".equalsIgnoreCase(shape) ? DEEP_EXTENSIONS_JSON : SHALLOW_EXTENSIONS_JSON;
-        return """
-            {"name":"%s","age":%d,"salary":%s,"extensions":%s}
-            """.formatted(VALID_NAME, VALID_AGE, VALID_SALARY.toPlainString(), extensionsJson).trim();
+        return toJson("deep".equalsIgnoreCase(shape) ? deepMapRequest() : shallowMapRequest());
     }
 
     public static String rawRequestBody(String shape) {
-        String extensionsJson = "deep".equalsIgnoreCase(shape) ? DEEP_EXTENSIONS_JSON : SHALLOW_EXTENSIONS_JSON;
-        return """
-            {"name":"%s","age":%d,"salary":%s,"extensions":"%s"}
-            """.formatted(
-                VALID_NAME,
-                VALID_AGE,
-                VALID_SALARY.toPlainString(),
-                escapeJson(extensionsJson))
-            .trim();
+        return toJson("deep".equalsIgnoreCase(shape) ? deepRawRequest() : shallowRawRequest());
     }
 
     public static String invalidMapRequestBody(String shape) {
-        String extensionsJson = "deep".equalsIgnoreCase(shape) ? INVALID_DEEP_EXTENSIONS_JSON : INVALID_SHALLOW_EXTENSIONS_JSON;
-        return """
-            {"name":"%s","age":%d,"salary":%s,"extensions":%s}
-            """.formatted(VALID_NAME, VALID_AGE, VALID_SALARY.toPlainString(), extensionsJson).trim();
+        return toJson("deep".equalsIgnoreCase(shape) ? invalidDeepMapRequest() : invalidShallowMapRequest());
     }
 
     public static String invalidRawRequestBody(String shape) {
-        String extensionsJson = "deep".equalsIgnoreCase(shape) ? INVALID_DEEP_EXTENSIONS_JSON : INVALID_SHALLOW_EXTENSIONS_JSON;
-        return """
-            {"name":"%s","age":%d,"salary":%s,"extensions":"%s"}
-            """.formatted(
-                VALID_NAME,
-                VALID_AGE,
-                VALID_SALARY.toPlainString(),
-                escapeJson(extensionsJson))
-            .trim();
+        return toJson("deep".equalsIgnoreCase(shape) ? invalidDeepRawRequest() : invalidShallowRawRequest());
     }
 
     public static String malformedRawRequestBody() {
-        return """
-            {"name":"%s","age":%d,"salary":%s,"extensions":"%s"}
-            """.formatted(
-                VALID_NAME,
-                VALID_AGE,
-                VALID_SALARY.toPlainString(),
-                escapeJson(MALFORMED_EXTENSIONS_JSON))
-            .trim();
+        return toJson(malformedRawRequest());
     }
 
     private static PerfMapValidationRequest mapRequest(Map<String, Object> extensions) {
@@ -126,42 +114,61 @@ public final class PerfPayloadFixtures {
     }
 
     private static void populateBaseFields(AbstractPerfValidationRequest request) {
-        request.setName(VALID_NAME);
-        request.setAge(VALID_AGE);
-        request.setSalary(VALID_SALARY);
+        request.setCartId(VALID_CART_ID);
+        request.setCustomerId(VALID_CUSTOMER_ID);
+        request.setCurrency(VALID_CURRENCY);
+        request.setTotalAmount(VALID_TOTAL_AMOUNT);
     }
 
     private static Map<String, Object> shallowExtensions() {
-        return Map.of("vendorExtensionCode", "ABC-1234");
+        return toMap(SHALLOW_CART);
     }
 
     private static Map<String, Object> invalidShallowExtensions() {
-        return Map.of("vendorExtensionCode", "abc-1234");
+        return toMap(INVALID_SHALLOW_CART);
     }
 
     private static Map<String, Object> deepExtensions() {
-        return Map.of(
-            "vendorExtensionCode", "ABC-1234",
-            "vendor", Map.of(
-                "contact", Map.of(
-                    "codes", List.of(
-                        Map.of("value", "ABC-1234"),
-                        Map.of("value", "DEF-5678"),
-                        Map.of("value", "GHI-9012")))));
+        return toMap(DEEP_CART);
     }
 
     private static Map<String, Object> invalidDeepExtensions() {
-        return Map.of(
-            "vendorExtensionCode", "ABC-1234",
-            "vendor", Map.of(
-                "contact", Map.of(
-                    "codes", List.of(
-                        Map.of("value", "ABC-1234"),
-                        Map.of("value", "DEF-5678"),
-                        Map.of("value", "ghi-9012")))));
+        return toMap(INVALID_DEEP_CART);
     }
 
-    private static String escapeJson(String raw) {
-        return raw.replace("\\", "\\\\").replace("\"", "\\\"");
+    private static String shallowExtensionsJson() {
+        return toJson(SHALLOW_CART);
+    }
+
+    private static String invalidShallowExtensionsJson() {
+        return toJson(INVALID_SHALLOW_CART);
+    }
+
+    private static String deepExtensionsJson() {
+        return toJson(DEEP_CART);
+    }
+
+    private static String invalidDeepExtensionsJson() {
+        return toJson(INVALID_DEEP_CART);
+    }
+
+    private static ShoppingCartItemPayload itemWithCode(String name, String catalogCode) {
+        return new ShoppingCartItemPayload(new ProductOfferingPayload(
+            name,
+            Map.of(
+                "catalogCode", catalogCode,
+                "channel", "digital")));
+    }
+
+    private static Map<String, Object> toMap(ShoppingCartPayload cart) {
+        return OBJECT_MAPPER.convertValue(cart, MAP_TYPE);
+    }
+
+    private static String toJson(Object value) {
+        try {
+            return OBJECT_MAPPER.writeValueAsString(value);
+        } catch (JsonProcessingException exception) {
+            throw new IllegalStateException("Failed to serialize perf payload", exception);
+        }
     }
 }

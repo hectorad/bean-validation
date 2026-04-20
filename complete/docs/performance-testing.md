@@ -39,8 +39,8 @@ Results are written to [extensions-validator.json](/Users/hectorad/Developer/gs-
 
 - `validationOff`: `com.ampp.validation-enabled=false`
 - `baselineOn`: validation enabled, no `Extensions` override
-- `shallowRule`: `jsonPath=$.vendorExtensionCode`
-- `deepRule`: `jsonPath=$.vendor.contact.codes[*].value`
+- `shallowRule`: `jsonPath=$.cartCode`
+- `deepRule`: `jsonPath=$.items[*].productOffering.tags.catalogCode`
 
 Measured scenarios:
 
@@ -61,19 +61,19 @@ Measured scenarios:
 
 Payload shapes:
 
-- shallow payload: top-level `vendorExtensionCode`
-- deep payload: top-level `vendorExtensionCode` plus `vendor.contact.codes[*].value` with 3 wildcard candidates
+- shallow payload: top-level `cartCode`
+- deep payload: top-level `cartCode` plus `items[*].productOffering.tags.catalogCode` with 3 wildcard candidates
 
-The deep payload intentionally includes the top-level shallow key, so `shallow_path_on_*_deep_payload` and `deep_path_on_*_deep_payload` run on the same body and isolate traversal-depth cost from payload-size cost.
+The deep payload intentionally includes the top-level shallow key, so `shallow_path_on_*_deep_payload` and `deep_path_on_*_deep_payload` run on the same shopping-cart body and isolate traversal-depth cost from payload-size cost.
 
 ### JMH setup checks
 
 The benchmark asserts correctness before timing starts:
 
 - validation off accepts invalid map/raw payloads and malformed raw JSON strings
-- baseline validation accepts valid payloads and ignores invalid extension content because no `Extensions` rule is active
-- shallow validation accepts shallow and deep payloads, rejects invalid shallow payloads, and rejects malformed raw JSON
-- deep validation accepts deep payloads and rejects invalid deep payloads
+- baseline validation accepts valid shopping-cart payloads and ignores invalid extension content because no `Extensions` rule is active
+- shallow validation accepts shallow and deep shopping-cart payloads, rejects invalid shallow payloads, and rejects malformed raw JSON
+- deep validation accepts deep shopping-cart payloads and rejects invalid deep payloads
 
 ## HTTP / Gatling
 
@@ -113,12 +113,12 @@ noglob java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
   --com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.perf.PerfMapValidationRequest \
   --com.ampp.businessValidationOverride[0].fields[0].fieldName=extensions \
   --com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions \
-  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.vendorExtensionCode \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.cartCode \
   --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$ \
   --com.ampp.businessValidationOverride[1].fullClassName=com.example.validatingforminput.perf.PerfRawValidationRequest \
   --com.ampp.businessValidationOverride[1].fields[0].fieldName=extensions \
   --com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions \
-  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.vendorExtensionCode \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.cartCode \
   --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$
 ```
 
@@ -131,12 +131,12 @@ noglob java -jar target/validating-form-input-0.0.1-SNAPSHOT.jar \
   --com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.perf.PerfMapValidationRequest \
   --com.ampp.businessValidationOverride[0].fields[0].fieldName=extensions \
   --com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions \
-  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value \
+  --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.items[*].productOffering.tags.catalogCode \
   --com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$ \
   --com.ampp.businessValidationOverride[1].fullClassName=com.example.validatingforminput.perf.PerfRawValidationRequest \
   --com.ampp.businessValidationOverride[1].fields[0].fieldName=extensions \
   --com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions \
-  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value \
+  --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.items[*].productOffering.tags.catalogCode \
   --com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$
 ```
 
@@ -163,6 +163,8 @@ The most useful HTTP comparison set is the same deep payload across all three mo
 - `deep/raw`
 
 Use `payloadShape=deep` for those runs so the shallow and deep validators inspect the same body.
+
+The measured model under test is a shopping-cart-shaped payload carried inside the `extensions` field. The wrapper request body around it now uses cart-domain baseline fields such as `cartId`, `customerId`, `currency`, and `totalAmount`.
 
 Generated Gatling reports go under `target/gatling/`.
 

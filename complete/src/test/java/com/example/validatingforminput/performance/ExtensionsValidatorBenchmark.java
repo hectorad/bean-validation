@@ -132,8 +132,8 @@ public class ExtensionsValidatorBenchmark {
         public void setUp() {
             validationOffContext = startContext(validationOffProperties());
             baselineContext = startContext(baselineProperties());
-            shallowContext = startContext(extensionProperties("$.vendorExtensionCode"));
-            deepContext = startContext(extensionProperties("$.vendor.contact.codes[*].value"));
+            shallowContext = startContext(extensionProperties("$.cartCode"));
+            deepContext = startContext(extensionProperties("$.items[*].productOffering.tags.catalogCode"));
 
             validationOffValidator = validationOffContext.getBean(Validator.class);
             baselineValidator = baselineContext.getBean(Validator.class);

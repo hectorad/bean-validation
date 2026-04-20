@@ -4,8 +4,6 @@ import java.math.BigDecimal;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -15,40 +13,55 @@ abstract class AbstractPerfValidationRequest {
 
     @NotNull
     @NotBlank
-    @Size(min = 3, max = 30)
-    @Pattern(regexp = "^[A-Za-z ]+$")
-    private String name;
+    @Size(min = 9, max = 24)
+    @Pattern(regexp = "^CART-[A-Z0-9]{4,19}$")
+    private String cartId;
 
     @NotNull
-    @Min(18)
-    @Max(60)
-    private Integer age;
+    @NotBlank
+    @Size(min = 8, max = 24)
+    private String customerId;
 
+    @NotNull
+    @NotBlank
+    @Size(min = 3, max = 3)
+    @Pattern(regexp = "^[A-Z]{3}$")
+    private String currency;
+
+    @NotNull
     @DecimalMin(value = "1000.00", inclusive = false)
-    @DecimalMax("250000.00")
-    private BigDecimal salary;
+    @DecimalMax("999999.99")
+    private BigDecimal totalAmount;
 
-    public String getName() {
-        return name;
+    public String getCartId() {
+        return cartId;
     }
 
-    public void setName(String name) {
-        this.name = name;
+    public void setCartId(String cartId) {
+        this.cartId = cartId;
     }
 
-    public Integer getAge() {
-        return age;
+    public String getCustomerId() {
+        return customerId;
     }
 
-    public void setAge(Integer age) {
-        this.age = age;
+    public void setCustomerId(String customerId) {
+        this.customerId = customerId;
     }
 
-    public BigDecimal getSalary() {
-        return salary;
+    public String getCurrency() {
+        return currency;
     }
 
-    public void setSalary(BigDecimal salary) {
-        this.salary = salary;
+    public void setCurrency(String currency) {
+        this.currency = currency;
+    }
+
+    public BigDecimal getTotalAmount() {
+        return totalAmount;
+    }
+
+    public void setTotalAmount(BigDecimal totalAmount) {
+        this.totalAmount = totalAmount;
     }
 }

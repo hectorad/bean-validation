@@ -9,12 +9,12 @@ import org.springframework.boot.test.context.SpringBootTest;
     "com.ampp.businessValidationOverride[0].fullClassName=com.example.validatingforminput.perf.PerfMapValidationRequest",
     "com.ampp.businessValidationOverride[0].fields[0].fieldName=extensions",
     "com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Extensions",
-    "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value",
+    "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.jsonPath=$.items[*].productOffering.tags.catalogCode",
     "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$",
     "com.ampp.businessValidationOverride[1].fullClassName=com.example.validatingforminput.perf.PerfRawValidationRequest",
     "com.ampp.businessValidationOverride[1].fields[0].fieldName=extensions",
     "com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Extensions",
-    "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.vendor.contact.codes[*].value",
+    "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.jsonPath=$.items[*].productOffering.tags.catalogCode",
     "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.regexp=^[A-Z]{3}-[0-9]{4}$"
 })
 @AutoConfigureMockMvc

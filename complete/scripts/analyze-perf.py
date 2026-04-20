@@ -262,9 +262,9 @@ def render_markdown(runs: list[RunStats], chart_path: Path, out_path: Path) -> N
         "## Reading the result",
         "",
         "- **`ext-off` → `ext-on-shallow`** = fixed cost of enabling the "
-        "`ExtensionsJsonPathRegex` validator (single-level JSONPath).",
+        "`ExtensionsJsonPathRegex` validator on the shopping-cart control path (`$.cartCode`).",
         "- **`ext-on-shallow` → `ext-on-deep`** = additional cost of traversing "
-        "a 5-level nested JSON document with an array wildcard (`$.vendor.contact.codes[*].value`).",
+        "the shopping cart item list with an array wildcard (`$.items[*].productOffering.tags.catalogCode`).",
         "- 0 KO across all runs confirms the comparison is on the validation-pass path.",
         "",
         "_Source reports_: `target/gatling/ext-off-*`, "

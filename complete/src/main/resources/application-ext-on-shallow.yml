@@ -46,16 +46,25 @@ com.ampp:
           constraints:
             - constraintType: Extensions
               params:
-                jsonPath: $.vendorExtensionCode
+                jsonPath: $.cartCode
                 regexp: "^[A-Z]{3}-[0-9]{4}$"
-              message: Vendor extension code format is invalid
+              message: Shopping cart code format is invalid
     - fullClassName: com.example.validatingforminput.perf.PerfMapValidationRequest
       fields:
         - fieldName: extensions
           constraints:
             - constraintType: Extensions
               params:
-                jsonPath: $.vendorExtensionCode
+                jsonPath: $.cartCode
                 regexp: "^[A-Z]{3}-[0-9]{4}$"
-              message: Vendor extension code format is invalid
+              message: Shopping cart code format is invalid
+    - fullClassName: com.example.validatingforminput.perf.PerfRawValidationRequest
+      fields:
+        - fieldName: extensions
+          constraints:
+            - constraintType: Extensions
+              params:
+                jsonPath: $.cartCode
+                regexp: "^[A-Z]{3}-[0-9]{4}$"
+              message: Shopping cart code format is invalid
   validation-enabled: true
