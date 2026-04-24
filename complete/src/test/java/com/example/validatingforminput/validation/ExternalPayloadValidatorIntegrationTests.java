@@ -22,7 +22,11 @@ import jakarta.validation.constraints.Size;
         "com.ampp.businessValidationOverride[0].fullClassName=com.example.validation.core.internal.ExternalPayloadValidatorIntegrationTests$PayloadTarget",
         "com.ampp.businessValidationOverride[0].fields[0].fieldName=name",
         "com.ampp.businessValidationOverride[0].fields[0].constraints[0].constraintType=Size",
-        "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.min=5"
+        "com.ampp.businessValidationOverride[0].fields[0].constraints[0].params.min=5",
+        "com.ampp.businessValidationOverride[1].fullClassName=com.example.validation.core.internal.ExternalPayloadValidatorIntegrationTests$SubclassPayload",
+        "com.ampp.businessValidationOverride[1].fields[0].fieldName=inheritedName",
+        "com.ampp.businessValidationOverride[1].fields[0].constraints[0].constraintType=Size",
+        "com.ampp.businessValidationOverride[1].fields[0].constraints[0].params.min=5"
     }
 )
 class ExternalPayloadValidatorIntegrationTests {
@@ -44,6 +48,22 @@ class ExternalPayloadValidatorIntegrationTests {
         assertThat(result.violations().getFirst().constraintType()).isEqualTo(Size.class.getName());
     }
 
+    @Test
+    void shouldEnforceOverrideForInheritedFieldWhenConfiguredOnSubclass() {
+        SubclassPayload target = new SubclassPayload();
+        target.setInheritedName("abcd");
+
+        ValidationResult<SubclassPayload> result = externalPayloadValidator.validate(target);
+
+        assertThat(result.valid()).isFalse();
+        assertThat(result.violations())
+            .singleElement()
+            .satisfies(violation -> {
+                assertThat(violation.propertyPath()).isEqualTo("inheritedName");
+                assertThat(violation.constraintType()).isEqualTo(Size.class.getName());
+            });
+    }
+
     static class PayloadTarget {
 
         @NotBlank
@@ -57,5 +77,22 @@ class ExternalPayloadValidatorIntegrationTests {
         public void setName(String name) {
             this.name = name;
         }
+    }
+
+    static class ParentPayload {
+
+        @Size(min = 1, max = 20)
+        private String inheritedName;
+
+        public String getInheritedName() {
+            return inheritedName;
+        }
+
+        public void setInheritedName(String inheritedName) {
+            this.inheritedName = inheritedName;
+        }
+    }
+
+    static class SubclassPayload extends ParentPayload {
     }
 }

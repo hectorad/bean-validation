@@ -3,6 +3,7 @@ package com.example.validation.core.internal;
 public record ResolvedFieldMapping(
 	String fieldName,
 	Class<?> fieldType,
+	Class<?> declaringClass,
 	BaselineFieldConstraints baselineConstraints,
 	FieldValidationMetadata validationMetadata
 ) {
