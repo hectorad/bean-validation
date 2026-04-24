@@ -5,10 +5,14 @@ import com.example.validation.core.api.JsonPathRegexRule;
 import com.example.validation.core.api.PatternRule;
 
 import java.lang.annotation.Annotation;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 
 import org.hibernate.validator.cfg.ConstraintDef;
 import org.hibernate.validator.cfg.ConstraintMapping;
@@ -51,32 +55,69 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	@Override
 	public void createConstraintMappings(ConstraintMappingBuilder builder) {
-		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
-			ConstraintMapping constraintMapping = builder.addConstraintMapping();
-			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
+		Map<Class<?>, Map<String, MergedFieldBucket>> bucketsByDeclaringClass = new LinkedHashMap<>();
 
+		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
 				List<RegisteredConstraintOverride> contributions = validationOverrideRegistry.contributionsFor(
 					resolvedClassMapping.className(),
 					resolvedFieldMapping.fieldName());
+
+				MergedFieldBucket bucket = bucketsByDeclaringClass
+					.computeIfAbsent(resolvedFieldMapping.declaringClass(), ignored -> new LinkedHashMap<>())
+					.computeIfAbsent(resolvedFieldMapping.fieldName(), ignored -> new MergedFieldBucket(resolvedFieldMapping));
+				bucket.addSources(resolvedClassMapping.className(), contributions);
+			}
+		}
+
+		for (Map.Entry<Class<?>, Map<String, MergedFieldBucket>> classEntry : bucketsByDeclaringClass.entrySet()) {
+			Class<?> declaringClass = classEntry.getKey();
+			ConstraintMapping constraintMapping = builder.addConstraintMapping();
+			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(declaringClass);
+
+			for (MergedFieldBucket bucket : classEntry.getValue().values()) {
 				try {
 					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
-						resolvedFieldMapping.baselineConstraints(),
-						contributions,
-						resolvedClassMapping.className(),
-						resolvedFieldMapping.fieldName());
+						bucket.resolvedFieldMapping.baselineConstraints(),
+						bucket.contributions,
+						declaringClass.getName(),
+						bucket.resolvedFieldMapping.fieldName());
 
-					applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
+					applyConstraints(typeContext, bucket.resolvedFieldMapping, effectiveConstraints);
 				}
 				catch (RuntimeException exception) {
 					log.warn(
 						"Skipping validation override constraint mapping for class={}, field={}, sources={} due to error: {}",
-						resolvedClassMapping.className(),
-						resolvedFieldMapping.fieldName(),
-						RegisteredConstraintOverride.renderSources(contributions),
+						bucket.renderConfiguredClasses(),
+						bucket.resolvedFieldMapping.fieldName(),
+						RegisteredConstraintOverride.renderSources(bucket.contributions),
 						exception.getMessage());
 				}
 			}
+		}
+	}
+
+	private static final class MergedFieldBucket {
+
+		private final ResolvedFieldMapping resolvedFieldMapping;
+
+		private final List<RegisteredConstraintOverride> contributions = new ArrayList<>();
+
+		private final Set<String> configuredClassNames = new LinkedHashSet<>();
+
+		private MergedFieldBucket(ResolvedFieldMapping resolvedFieldMapping) {
+			this.resolvedFieldMapping = resolvedFieldMapping;
+		}
+
+		private void addSources(String configuredClassName, List<RegisteredConstraintOverride> newContributions) {
+			configuredClassNames.add(configuredClassName);
+			contributions.addAll(newContributions);
+		}
+
+		private String renderConfiguredClasses() {
+			return (configuredClassNames.size() == 1)
+				? configuredClassNames.iterator().next()
+				: configuredClassNames.toString();
 		}
 	}
 

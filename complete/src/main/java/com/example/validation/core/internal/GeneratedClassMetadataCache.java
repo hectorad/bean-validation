@@ -149,7 +149,7 @@ public class GeneratedClassMetadataCache {
 		BaselineFieldConstraints baseline = extractBaseline(field, getter, className);
 		FieldValidationMetadata validationMetadata = extractValidationMetadata(field, getter);
 		validateConstraints(className, field, baseline, constraints);
-		return new ResolvedFieldMapping(fieldName, field.getType(), baseline, validationMetadata);
+		return new ResolvedFieldMapping(fieldName, field.getType(), field.getDeclaringClass(), baseline, validationMetadata);
 	}
 
 	private Class<?> resolveClass(String className) {
