@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Constraint Visualizer</title>
+<script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --panel-2: #1e222b;
+    --border: #2a2f3a;
+    --text: #e6e8ee;
+    --muted: #8a91a0;
+    --accent: #7aa2f7;
+    --ok: #9ece6a;
+    --warn: #e0af68;
+    --err: #f7768e;
+    --cfg: #bb9af7;
+    --api: #7dcfff;
+    --both: #9ece6a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 16px;
+    font: 13px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+  }
+  h1 { font-size: 18px; margin: 0 0 12px; }
+  h2 { font-size: 14px; margin: 20px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  h3 { font-size: 14px; margin: 0 0 8px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .col { flex: 1 1 440px; min-width: 0; }
+  .panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; margin-bottom: 12px;
+  }
+  label.block { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+  textarea, input[type=text], input[type=url] {
+    width: 100%; background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px; padding: 8px;
+    font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+  textarea { min-height: 140px; resize: vertical; }
+  button {
+    background: var(--panel-2); color: var(--text);
+    border: 1px solid var(--border); border-radius: 6px;
+    padding: 6px 12px; cursor: pointer; font: inherit;
+  }
+  button.primary { background: var(--accent); color: #0b0d12; border-color: var(--accent); font-weight: 600; }
+  button:hover { filter: brightness(1.15); }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td {
+    text-align: left; padding: 6px 8px;
+    border-bottom: 1px solid var(--border); vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 500; }
+  td code { font: 11px/1.3 ui-monospace, Menlo, monospace; color: var(--text); }
+  tr.conflict td { background: rgba(247, 118, 142, 0.08); }
+
+  .chip {
+    display: inline-block; padding: 1px 6px; margin-right: 4px;
+    border-radius: 10px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.05em;
+    border: 1px solid var(--border);
+  }
+  .chip.openapi { color: var(--api); border-color: var(--api); }
+  .chip.config  { color: var(--cfg); border-color: var(--cfg); }
+  .chip.both    { color: var(--both); border-color: var(--both); }
+  .chip.warn    { color: var(--warn); border-color: var(--warn); }
+  .chip.method  { font-weight: 600; }
+  .chip.method.POST { color: var(--ok); border-color: var(--ok); }
+  .chip.method.GET  { color: var(--api); border-color: var(--api); }
+  .chip.method.PUT, .chip.method.PATCH { color: var(--warn); border-color: var(--warn); }
+  .chip.method.DELETE { color: var(--err); border-color: var(--err); }
+  .status-ok  { color: var(--ok);  font-weight: 600; }
+  .status-bad { color: var(--err); font-weight: 600; }
+
+  .schema-card, .endpoint-card {
+    background: var(--panel-2); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px; margin-bottom: 10px;
+  }
+  .muted { color: var(--muted); }
+  .url { font: 12px/1.4 ui-monospace, Menlo, monospace; color: var(--api); word-break: break-all; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; font-size: 12px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; font-family: ui-monospace, Menlo, monospace; }
+  pre.resp {
+    background: #0b0d12; border: 1px solid var(--border); border-radius: 6px;
+    padding: 8px; margin: 6px 0; overflow: auto; max-height: 320px;
+    font: 11px/1.4 ui-monospace, Menlo, monospace;
+  }
+  details > summary { cursor: pointer; color: var(--muted); margin: 6px 0; }
+  .headers-table input { font-size: 11px; padding: 3px 6px; }
+  .headers-table td { padding: 3px 4px; border: none; }
+  .small { font-size: 11px; color: var(--muted); }
+  .error-box { color: var(--err); background: rgba(247,118,142,0.08); border: 1px solid var(--err); padding: 6px 8px; border-radius: 6px; margin: 6px 0; }
+</style>
+</head>
+<body>
+
+<h1>Constraint Visualizer</h1>
+
+<div class="panel">
+  <div class="row">
+    <div class="col">
+      <label class="block" for="openapiFile">OpenAPI / Swagger YAML</label>
+      <input type="file" id="openapiFile" accept=".yml,.yaml,.json">
+      <textarea id="openapiText" placeholder="Paste your OpenAPI YAML here..."></textarea>
+    </div>
+    <div class="col">
+      <label class="block" for="configFile">Constraint config YAML (application-ext-on-deep.yml shape)</label>
+      <input type="file" id="configFile" accept=".yml,.yaml">
+      <textarea id="configText" placeholder="Paste your constraint config YAML here..."></textarea>
+    </div>
+  </div>
+  <div class="toolbar">
+    <button class="primary" id="parseBtn">Parse</button>
+    <button id="clearBtn">Clear</button>
+    <span id="parseStatus" class="small"></span>
+  </div>
+</div>
+
+<div class="panel">
+  <label class="block" for="baseUrl">Base URL (for live sending)</label>
+  <input type="url" id="baseUrl" value="http://localhost:8080">
+</div>
+
+<h2>Schemas</h2>
+<div id="schemas"></div>
+
+<h2>Endpoints</h2>
+<div id="endpoints"></div>
+
+<script>
+// ---------- Aliases: short schema name -> fully qualified class name ----------
+const DEFAULT_ALIASES = {
+  "PersonForm": "com.example.validatingforminput.PersonForm",
+  "PerfMapValidationRequest": "com.example.validatingforminput.perf.PerfMapValidationRequest",
+  "PerfRawValidationRequest": "com.example.validatingforminput.perf.PerfRawValidationRequest"
+};
+
+// ---------- OpenAPI constraint extraction ----------
+function extractOpenApi(propSchema, requiredList, propName) {
+  const out = [];
+  if (requiredList && requiredList.indexOf(propName) >= 0) {
+    out.push({ kind: "Required", source: "openapi" });
+  }
+  if (propSchema == null || typeof propSchema !== "object") return out;
+  const s = propSchema;
+  if (s.minLength != null || s.maxLength != null) {
+    out.push({ kind: "Size", min: s.minLength ?? null, max: s.maxLength ?? null, source: "openapi" });
+  }
+  if (s.minimum != null) {
+    out.push({ kind: s.type === "integer" ? "Min" : "DecimalMin",
+               value: s.minimum, inclusive: s.exclusiveMinimum !== true, source: "openapi" });
+  }
+  if (s.maximum != null) {
+    out.push({ kind: s.type === "integer" ? "Max" : "DecimalMax",
+               value: s.maximum, inclusive: s.exclusiveMaximum !== true, source: "openapi" });
+  }
+  if (s.pattern) out.push({ kind: "Pattern", regexp: s.pattern, source: "openapi" });
+  if (s["x-extensions"]) {
+    const xe = s["x-extensions"];
+    out.push({ kind: "Extensions", jsonPath: xe.jsonPath, regexp: xe.regexp, source: "openapi" });
+  }
+  return out;
+}
+
+// ---------- Config constraint extraction ----------
+function extractConfig(configRoot, fullClassName, propName) {
+  const out = [];
+  const overrides = configRoot?.["com.ampp"]?.businessValidationOverride;
+  if (!Array.isArray(overrides)) return out;
+  const cls = overrides.find(o => o.fullClassName === fullClassName);
+  if (!cls || !Array.isArray(cls.fields)) return out;
+  const fld = cls.fields.find(f => f.fieldName === propName);
+  if (!fld || !Array.isArray(fld.constraints)) return out;
+
+  for (const c of fld.constraints) {
+    const t = c.constraintType;
+    const p = c.params ?? {};
+    const msg = c.message;
+    switch (t) {
+      case "NotNull":    out.push({ kind: "Required",  message: msg, source: "config" }); break;
+      case "NotBlank":   out.push({ kind: "NotBlank",  message: msg, source: "config" }); break;
+      case "Size":       out.push({ kind: "Size", min: p.min ?? null, max: p.max ?? null, message: msg, source: "config" }); break;
+      case "Pattern":    out.push({ kind: "Pattern", regexp: p.regexp, message: msg, source: "config" }); break;
+      case "Min":        out.push({ kind: "Min", value: p.value, inclusive: true, message: msg, source: "config" }); break;
+      case "Max":        out.push({ kind: "Max", value: p.value, inclusive: true, message: msg, source: "config" }); break;
+      case "DecimalMin": out.push({ kind: "DecimalMin", value: p.value, inclusive: p.inclusive !== false, message: msg, source: "config" }); break;
+      case "DecimalMax": out.push({ kind: "DecimalMax", value: p.value, inclusive: p.inclusive !== false, message: msg, source: "config" }); break;
+      case "Extensions": out.push({ kind: "Extensions", jsonPath: p.jsonPath, regexp: p.regexp, message: msg, source: "config" }); break;
+      default:           out.push({ kind: t, params: p, message: msg, source: "config" });
+    }
+  }
+  return out;
+}
+
+// ---------- Merge: stricter wins ----------
+function mergeOne(kind, a, b) {
+  if (a && !b) return { ...a, source: "openapi" };
+  if (b && !a) return { ...b, source: "config" };
+  if (!a && !b) return null;
+  const winTag = "both";
+  switch (kind) {
+    case "Size": {
+      const min = strictestMin(a.min, b.min);
+      const max = strictestMax(a.max, b.max);
+      const conflict = (min != null && max != null && min > max);
+      return { kind, min, max, message: b.message ?? a.message, source: winTag, conflict };
+    }
+    case "Min": case "DecimalMin": {
+      const value = strictestMin(a.value, b.value);
+      return { kind, value, inclusive: (a.inclusive !== false) && (b.inclusive !== false),
+               message: b.message ?? a.message, source: winTag };
+    }
+    case "Max": case "DecimalMax": {
+      const value = strictestMax(a.value, b.value);
+      return { kind, value, inclusive: (a.inclusive !== false) && (b.inclusive !== false),
+               message: b.message ?? a.message, source: winTag };
+    }
+    case "Pattern": {
+      const conflict = a.regexp && b.regexp && a.regexp !== b.regexp;
+      return { kind, regexp: b.regexp ?? a.regexp, message: b.message ?? a.message,
+               source: b.regexp ? "config" : "openapi", conflict };
+    }
+    case "Required": case "NotBlank":
+      return { kind, message: b?.message ?? a?.message, source: winTag };
+    case "Extensions":
+      return { kind, jsonPath: b.jsonPath ?? a.jsonPath, regexp: b.regexp ?? a.regexp,
+               message: b.message ?? a.message, source: winTag };
+    default:
+      return b ? { ...b, source: "config" } : { ...a, source: "openapi" };
+  }
+}
+function strictestMin(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  return Number(a) > Number(b) ? a : b;
+}
+function strictestMax(a, b) {
+  if (a == null) return b; if (b == null) return a;
+  return Number(a) < Number(b) ? a : b;
+}
+
+function mergeAll(openApiRules, configRules) {
+  const byKind = {};
+  for (const r of openApiRules) byKind[r.kind] = byKind[r.kind] || { a: null, b: null };
+  for (const r of configRules)  byKind[r.kind] = byKind[r.kind] || { a: null, b: null };
+  for (const r of openApiRules) byKind[r.kind].a = r;
+  for (const r of configRules)  byKind[r.kind].b = r;
+  const effective = [];
+  for (const k of Object.keys(byKind)) {
+    const { a, b } = byKind[k];
+    const merged = mergeOne(k, a, b);
+    if (merged) effective.push(merged);
+  }
+  return effective;
+}
+
+// ---------- Rendering ----------
+function renderRule(r) {
+  if (!r) return "<span class='muted'>—</span>";
+  const bits = [];
+  switch (r.kind) {
+    case "Required": bits.push("Required"); break;
+    case "NotBlank": bits.push("NotBlank"); break;
+    case "Size":
+      bits.push(`Size(min=${r.min ?? "–"}, max=${r.max ?? "–"})`); break;
+    case "Pattern":
+      bits.push(`Pattern(<code>${escapeHtml(r.regexp ?? "")}</code>)`); break;
+    case "Min": bits.push(`Min(${r.value}${r.inclusive === false ? ", exclusive" : ""})`); break;
+    case "Max": bits.push(`Max(${r.value}${r.inclusive === false ? ", exclusive" : ""})`); break;
+    case "DecimalMin": bits.push(`DecimalMin(${r.value}${r.inclusive === false ? ", exclusive" : ""})`); break;
+    case "DecimalMax": bits.push(`DecimalMax(${r.value}${r.inclusive === false ? ", exclusive" : ""})`); break;
+    case "Extensions":
+      bits.push(`Extensions(jsonPath=<code>${escapeHtml(r.jsonPath ?? "")}</code>, regexp=<code>${escapeHtml(r.regexp ?? "")}</code>)`); break;
+    default: bits.push(`${r.kind}(${JSON.stringify(r.params ?? {})})`);
+  }
+  if (r.message) bits.push(`<div class='small'>${escapeHtml(r.message)}</div>`);
+  return bits.join(" ");
+}
+
+function renderConstraintTable(openApiRules, configRules, effective) {
+  const kinds = new Set([...openApiRules, ...configRules, ...effective].map(r => r.kind));
+  const rows = [];
+  for (const k of kinds) {
+    const a = openApiRules.find(r => r.kind === k);
+    const b = configRules.find(r => r.kind === k);
+    const e = effective.find(r => r.kind === k);
+    const conflict = e?.conflict ? "<span class='chip warn'>conflict</span>" : "";
+    const wonChip = e ? `<span class='chip ${e.source}'>won=${e.source}</span>` : "";
+    rows.push(`<tr class="${e?.conflict ? "conflict" : ""}">
+      <td>${k} ${conflict}</td>
+      <td>${renderRule(a)}</td>
+      <td>${renderRule(b)}</td>
+      <td>${renderRule(e)} ${wonChip}</td>
+    </tr>`);
+  }
+  if (rows.length === 0) return "<div class='muted small'>No constraints.</div>";
+  return `<table>
+    <thead><tr><th>Kind</th><th>OpenAPI</th><th>Config</th><th>Effective</th></tr></thead>
+    <tbody>${rows.join("")}</tbody></table>`;
+}
+
+function renderSchemaCard(name, schema, config) {
+  const fqn = DEFAULT_ALIASES[name] || name;
+  const props = schema?.properties ?? {};
+  const required = schema?.required ?? [];
+  const sections = Object.keys(props).map(prop => {
+    const openApi = extractOpenApi(props[prop], required, prop);
+    const cfg     = extractConfig(config, fqn, prop);
+    const eff     = mergeAll(openApi, cfg);
+    return `<details ${openApi.length + cfg.length > 0 ? "open" : ""}>
+      <summary><strong>${escapeHtml(prop)}</strong> <span class='small'>${escapeHtml(props[prop]?.type ?? "")}</span></summary>
+      ${renderConstraintTable(openApi, cfg, eff)}
+    </details>`;
+  }).join("");
+  return `<div class="schema-card">
+    <h3>${escapeHtml(name)} <span class='small muted'>${escapeHtml(fqn)}</span></h3>
+    ${sections || "<div class='muted small'>No properties.</div>"}
+  </div>`;
+}
+
+// ---------- Endpoint rendering + live send ----------
+function seedBody(schema, openapi) {
+  if (!schema) return "{}";
+  if (schema.$ref) {
+    const name = schema.$ref.split("/").pop();
+    const resolved = openapi?.components?.schemas?.[name];
+    return seedBody(resolved, openapi);
+  }
+  if (schema.example != null) return JSON.stringify(schema.example, null, 2);
+  const sample = buildSample(schema, openapi, new Set());
+  return JSON.stringify(sample, null, 2);
+}
+function buildSample(schema, openapi, seen) {
+  if (!schema || typeof schema !== "object") return null;
+  if (schema.$ref) {
+    if (seen.has(schema.$ref)) return null;
+    seen.add(schema.$ref);
+    const name = schema.$ref.split("/").pop();
+    return buildSample(openapi?.components?.schemas?.[name], openapi, seen);
+  }
+  if (schema.example != null) return schema.example;
+  switch (schema.type) {
+    case "string":  return schema.pattern ? "" : "string";
+    case "integer": return schema.minimum ?? 0;
+    case "number":  return schema.minimum ?? 0;
+    case "boolean": return false;
+    case "array":   return [buildSample(schema.items, openapi, seen)];
+    case "object":
+    default: {
+      const obj = {};
+      const props = schema.properties ?? {};
+      for (const k of Object.keys(props)) obj[k] = buildSample(props[k], openapi, seen);
+      return obj;
+    }
+  }
+}
+
+function renderEndpointCard(path, method, op, openapi) {
+  const id = `ep-${method}-${path.replace(/[^a-z0-9]/gi, "_")}`;
+  const reqSchema = op?.requestBody?.content?.["application/json"]?.schema
+    ?? op?.requestBody?.content?.["*/*"]?.schema;
+  const body = reqSchema ? seedBody(reqSchema, openapi) : "";
+  return `<div class="endpoint-card" id="${id}">
+    <h3><span class="chip method ${method}">${method}</span> <span class="url">${escapeHtml(path)}</span></h3>
+    ${op.summary ? `<div class='small muted'>${escapeHtml(op.summary)}</div>` : ""}
+    <div class="row" style="margin-top:8px;">
+      <div class="col">
+        <label class="block">Headers</label>
+        <table class="headers-table"><tbody>
+          <tr><td><input type="text" value="Content-Type"></td><td><input type="text" value="application/json"></td></tr>
+          <tr><td><input type="text" value="Accept"></td><td><input type="text" value="application/json"></td></tr>
+          <tr><td><input type="text" placeholder="(header)"></td><td><input type="text" placeholder="(value)"></td></tr>
+        </tbody></table>
+        <label class="block" style="margin-top:8px;">Body</label>
+        <textarea class="req-body" spellcheck="false">${escapeHtml(body)}</textarea>
+        <div class="toolbar">
+          <button class="primary send-btn" data-path="${escapeHtml(path)}" data-method="${method}">Send</button>
+          <span class="small rtt muted"></span>
+        </div>
+      </div>
+      <div class="col">
+        <label class="block">Response</label>
+        <div class="resp-status muted small">(no request sent yet)</div>
+        <pre class="resp resp-body"></pre>
+        <details><summary>Response headers</summary><pre class="resp resp-headers"></pre></details>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function sendRequest(card) {
+  const method = card.querySelector(".send-btn").dataset.method;
+  const path   = card.querySelector(".send-btn").dataset.path;
+  const base   = document.getElementById("baseUrl").value.replace(/\/+$/, "");
+  const url    = base + path;
+  const body   = card.querySelector(".req-body").value;
+  const headers = {};
+  card.querySelectorAll(".headers-table tr").forEach(tr => {
+    const [k, v] = tr.querySelectorAll("input");
+    if (k.value.trim()) headers[k.value.trim()] = v.value;
+  });
+
+  const statusEl = card.querySelector(".resp-status");
+  const bodyEl   = card.querySelector(".resp-body");
+  const hdrEl    = card.querySelector(".resp-headers");
+  const rttEl    = card.querySelector(".rtt");
+  statusEl.className = "resp-status muted small";
+  statusEl.textContent = "Sending...";
+  bodyEl.textContent = ""; hdrEl.textContent = ""; rttEl.textContent = "";
+
+  const t0 = performance.now();
+  try {
+    const resp = await fetch(url, {
+      method, headers,
+      body: (method === "GET" || method === "HEAD") ? undefined : body
+    });
+    const dt = (performance.now() - t0).toFixed(0);
+    const text = await resp.text();
+    const ok = resp.ok;
+    statusEl.className = "resp-status " + (ok ? "status-ok" : "status-bad");
+    statusEl.textContent = `${resp.status} ${resp.statusText}`;
+    rttEl.textContent = `${dt} ms`;
+    try { bodyEl.textContent = JSON.stringify(JSON.parse(text), null, 2); }
+    catch { bodyEl.textContent = text; }
+    const hs = []; resp.headers.forEach((v, k) => hs.push(`${k}: ${v}`));
+    hdrEl.textContent = hs.join("\n");
+  } catch (e) {
+    const dt = (performance.now() - t0).toFixed(0);
+    statusEl.className = "resp-status status-bad";
+    statusEl.textContent = "Network error";
+    rttEl.textContent = `${dt} ms`;
+    bodyEl.innerHTML = `<div class='error-box'>${escapeHtml(String(e))}<br><span class='small'>Common cause: CORS. Ensure PerfValidationCorsConfig is active and backend is running.</span></div>`;
+  }
+}
+
+// ---------- Parsing driver ----------
+function parse() {
+  const status = document.getElementById("parseStatus");
+  const openapiText = document.getElementById("openapiText").value;
+  const configText  = document.getElementById("configText").value;
+  let openapi = null, config = null;
+  try { openapi = openapiText.trim() ? jsyaml.load(openapiText) : null; }
+  catch (e) { status.textContent = "OpenAPI YAML parse error: " + e.message; status.style.color = "var(--err)"; return; }
+  try { config  = configText.trim()  ? jsyaml.load(configText)  : null; }
+  catch (e) { status.textContent = "Config YAML parse error: " + e.message; status.style.color = "var(--err)"; return; }
+
+  const schemasDiv = document.getElementById("schemas");
+  const endpointsDiv = document.getElementById("endpoints");
+  schemasDiv.innerHTML = ""; endpointsDiv.innerHTML = "";
+
+  const schemas = openapi?.components?.schemas ?? {};
+  for (const name of Object.keys(schemas)) {
+    schemasDiv.insertAdjacentHTML("beforeend", renderSchemaCard(name, schemas[name], config));
+  }
+  if (!Object.keys(schemas).length) schemasDiv.innerHTML = "<div class='muted small'>No schemas in components.schemas.</div>";
+
+  const paths = openapi?.paths ?? {};
+  for (const p of Object.keys(paths)) {
+    for (const m of Object.keys(paths[p])) {
+      const method = m.toUpperCase();
+      if (!["GET","POST","PUT","PATCH","DELETE"].includes(method)) continue;
+      endpointsDiv.insertAdjacentHTML("beforeend", renderEndpointCard(p, method, paths[p][m], openapi));
+    }
+  }
+  if (!Object.keys(paths).length) endpointsDiv.innerHTML = "<div class='muted small'>No paths.</div>";
+
+  endpointsDiv.querySelectorAll(".endpoint-card").forEach(card => {
+    card.querySelector(".send-btn").addEventListener("click", () => sendRequest(card));
+  });
+
+  const nSchemas = Object.keys(schemas).length;
+  const nOps = Object.values(paths).reduce((a, p) => a + Object.keys(p).length, 0);
+  status.textContent = `Parsed — ${nSchemas} schema(s), ${nOps} operation(s).`;
+  status.style.color = "var(--ok)";
+}
+
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+// ---------- Wire-up ----------
+function readFileInto(input, textareaId) {
+  input.addEventListener("change", () => {
+    const f = input.files[0]; if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { document.getElementById(textareaId).value = r.result; };
+    r.readAsText(f);
+  });
+}
+readFileInto(document.getElementById("openapiFile"), "openapiText");
+readFileInto(document.getElementById("configFile"),  "configText");
+
+document.getElementById("parseBtn").addEventListener("click", parse);
+document.getElementById("clearBtn").addEventListener("click", () => {
+  ["openapiText","configText"].forEach(id => document.getElementById(id).value = "");
+  document.getElementById("schemas").innerHTML = "";
+  document.getElementById("endpoints").innerHTML = "";
+  document.getElementById("parseStatus").textContent = "";
+});
+</script>
+</body>
+</html>
