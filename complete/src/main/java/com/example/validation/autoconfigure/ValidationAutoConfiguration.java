@@ -5,7 +5,6 @@ import com.example.validation.core.internal.BeanValidationExternalPayloadValidat
 import com.example.validation.core.internal.ConfigDrivenConstraintMappingContributor;
 import com.example.validation.core.internal.ConstraintMergeService;
 import com.example.validation.core.internal.GeneratedClassMetadataCache;
-import com.example.validation.core.internal.InheritedFieldOverrideValidationProcessor;
 import com.example.validation.core.internal.PropertiesValidationOverrideContributor;
 import com.example.validation.core.internal.RequestAwareValidatingLocalValidatorFactoryBean;
 import com.example.validation.core.internal.BusinessValidationOverrideProperties;
@@ -49,18 +48,13 @@ public class ValidationAutoConfiguration {
     public LocalValidatorFactoryBean defaultValidator(
             ApplicationContext applicationContext,
             ObjectProvider<ValidationConfigurationCustomizer> customizers,
-            ValidationProperties validationProperties,
-            ObjectProvider<InheritedFieldOverrideValidationProcessor> inheritedFieldOverrideValidationProcessorProvider
+            ValidationProperties validationProperties
     ) {
         if (!validationProperties.isValidationEnabled()) {
             log.warn("*** ALL VALIDATION IS DISABLED (com.ampp.validation-enabled=false). "
                     + "No constraints will be enforced on any field. ***");
         }
-        return configureDefaultValidator(
-                applicationContext,
-                customizers,
-                validationProperties,
-                inheritedFieldOverrideValidationProcessorProvider.getIfAvailable());
+        return configureDefaultValidator(applicationContext, customizers, validationProperties);
     }
     @Configuration(proxyBeanMethods = false)
     @ConditionalOnProperty(name = "com.ampp.validation-enabled", havingValue = "true", matchIfMissing = true)
@@ -112,20 +106,6 @@ public class ValidationAutoConfiguration {
                 ConstraintMergeService constraintMergeService
         ) {
             return new ConfigDrivenConstraintMappingContributor(
-                    validationOverrideRegistry,
-                    generatedClassMetadataCache,
-                    constraintMergeService);
-        }
-
-        @Bean
-        @ConditionalOnMissingBean
-        @RefreshScope
-        InheritedFieldOverrideValidationProcessor inheritedFieldOverrideValidationProcessor(
-                ValidationOverrideRegistry validationOverrideRegistry,
-                GeneratedClassMetadataCache generatedClassMetadataCache,
-                ConstraintMergeService constraintMergeService
-        ) {
-            return new InheritedFieldOverrideValidationProcessor(
                     validationOverrideRegistry,
                     generatedClassMetadataCache,
                     constraintMergeService);
@@ -191,13 +171,10 @@ public class ValidationAutoConfiguration {
     private static RequestAwareValidatingLocalValidatorFactoryBean configureDefaultValidator(
             ApplicationContext applicationContext,
             ObjectProvider<ValidationConfigurationCustomizer> customizers,
-            ValidationProperties validationProperties,
-            InheritedFieldOverrideValidationProcessor inheritedFieldOverrideValidationProcessor
+            ValidationProperties validationProperties
     ) {
         RequestAwareValidatingLocalValidatorFactoryBean factoryBean =
-                new RequestAwareValidatingLocalValidatorFactoryBean(
-                        validationProperties,
-                        inheritedFieldOverrideValidationProcessor);
+                new RequestAwareValidatingLocalValidatorFactoryBean(validationProperties);
         factoryBean.setConfigurationInitializer(configuration ->
                 customizers.orderedStream().forEach(customizer -> customizer.customize(configuration)));
         factoryBean.setMessageInterpolator(new MessageInterpolatorFactory(applicationContext).getObject());
