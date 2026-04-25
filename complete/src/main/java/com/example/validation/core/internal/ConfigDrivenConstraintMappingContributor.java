@@ -56,6 +56,9 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
 
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
+				if (resolvedFieldMapping.isInheritedFrom(resolvedClassMapping.clazz())) {
+					continue;
+				}
 				List<RegisteredConstraintOverride> contributions = validationOverrideRegistry.contributionsFor(
 					resolvedClassMapping.className(),
 					resolvedFieldMapping.fieldName());

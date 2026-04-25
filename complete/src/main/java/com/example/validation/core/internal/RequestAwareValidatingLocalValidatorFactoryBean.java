@@ -2,8 +2,10 @@ package com.example.validation.core.internal;
 
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Set;
 
 import org.springframework.validation.Errors;
@@ -20,10 +22,20 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
 
     private final ValidationProperties validationProperties;
 
+    private final InheritedFieldOverrideValidationProcessor inheritedFieldOverrideValidationProcessor;
+
     private final ExecutableValidator executableValidator = new RequestAwareExecutableValidator();
 
     public RequestAwareValidatingLocalValidatorFactoryBean(ValidationProperties validationProperties) {
+        this(validationProperties, null);
+    }
+
+    public RequestAwareValidatingLocalValidatorFactoryBean(
+        ValidationProperties validationProperties,
+        InheritedFieldOverrideValidationProcessor inheritedFieldOverrideValidationProcessor
+    ) {
         this.validationProperties = validationProperties;
+        this.inheritedFieldOverrideValidationProcessor = inheritedFieldOverrideValidationProcessor;
     }
 
     @Override
@@ -31,7 +43,11 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
         if (shouldBypassValidation()) {
             return;
         }
-        super.validate(target, errors);
+        if (!shouldProcessInheritedOverrides()) {
+            super.validate(target, errors);
+            return;
+        }
+        processConstraintViolations(validateAndProcess(target), errors);
     }
 
     @Override
@@ -39,7 +55,11 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
         if (shouldBypassValidation()) {
             return;
         }
-        super.validate(target, errors, validationHints);
+        if (!shouldProcessInheritedOverrides()) {
+            super.validate(target, errors, validationHints);
+            return;
+        }
+        processConstraintViolations(validateAndProcess(target, validationGroups(validationHints)), errors);
     }
 
     @Override
@@ -47,7 +67,11 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
         if (shouldBypassValidation()) {
             return Collections.emptySet();
         }
-        return super.validate(object, groups);
+        Set<ConstraintViolation<T>> violations = super.validate(object, groups);
+        if (!shouldProcessInheritedOverrides()) {
+            return violations;
+        }
+        return inheritedFieldOverrideValidationProcessor.process(object, violations, groups);
     }
 
     @Override
@@ -101,6 +125,32 @@ public class RequestAwareValidatingLocalValidatorFactoryBean extends LocalValida
         }
 
         return false;
+    }
+
+    private boolean shouldProcessInheritedOverrides() {
+        return inheritedFieldOverrideValidationProcessor != null
+            && inheritedFieldOverrideValidationProcessor.hasOverrides();
+    }
+
+    @SuppressWarnings({ "unchecked", "rawtypes" })
+    private Set<ConstraintViolation<Object>> validateAndProcess(Object target, Class<?>... groups) {
+        return (Set) validate(target, groups);
+    }
+
+    private Class<?>[] validationGroups(Object... validationHints) {
+        if (validationHints == null || validationHints.length == 0) {
+            return new Class<?>[0];
+        }
+        List<Class<?>> groups = new ArrayList<>();
+        for (Object hint : validationHints) {
+            if (hint instanceof Class<?> group) {
+                groups.add(group);
+            }
+            else if (hint instanceof Class<?>[] groupArray) {
+                Collections.addAll(groups, groupArray);
+            }
+        }
+        return groups.toArray(Class<?>[]::new);
     }
 
     private ExecutableValidator delegateExecutableValidator() {
