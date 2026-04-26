@@ -6,7 +6,6 @@ import com.example.validation.core.api.PatternRule;
 
 import java.lang.annotation.Annotation;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -54,17 +53,13 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 	public void createConstraintMappings(ConstraintMappingBuilder builder) {
 		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
 			ConstraintMapping constraintMapping = builder.addConstraintMapping();
-			Map<Class<?>, TypeConstraintMappingContext<?>> typeContexts = new LinkedHashMap<>();
+			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
 
 			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
 				List<RegisteredConstraintOverride> contributions = validationOverrideRegistry.contributionsFor(
 					resolvedClassMapping.className(),
 					resolvedFieldMapping.fieldName());
 				try {
-					TypeConstraintMappingContext<?> typeContext = typeContextFor(
-						constraintMapping,
-						typeContexts,
-						resolvedFieldMapping.declaringClass());
 					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
 						resolvedFieldMapping.baselineConstraints(),
 						contributions,
@@ -83,14 +78,6 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 				}
 			}
 		}
-	}
-
-	private TypeConstraintMappingContext<?> typeContextFor(
-		ConstraintMapping constraintMapping,
-		Map<Class<?>, TypeConstraintMappingContext<?>> typeContexts,
-		Class<?> declaringClass
-	) {
-		return typeContexts.computeIfAbsent(declaringClass, constraintMapping::type);
 	}
 
 	private void applyConstraints(

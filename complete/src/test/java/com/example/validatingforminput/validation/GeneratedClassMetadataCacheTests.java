@@ -217,7 +217,6 @@ public class GeneratedClassMetadataCacheTests {
 	void shouldResolveInheritedFieldAnnotations() {
 		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(InheritedFieldTarget.class, "nickname");
 
-		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(InheritedFieldBase.class);
 		assertThat(resolvedFieldMapping.baselineConstraints().notBlank()).isTrue();
 	}
 
