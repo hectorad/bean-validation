@@ -25,7 +25,11 @@ import org.hibernate.validator.cfg.defs.NotNullDef;
 import org.hibernate.validator.cfg.defs.PatternDef;
 import org.hibernate.validator.cfg.defs.SizeDef;
 import org.hibernate.validator.spi.cfg.ConstraintMappingContributor;
+import org.springframework.beans.BeanUtils;
 import org.springframework.core.annotation.AnnotationUtils;
+
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.Method;
 
 import jakarta.validation.Payload;
 
@@ -66,7 +70,7 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 						resolvedClassMapping.className(),
 						resolvedFieldMapping.fieldName());
 
-					applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
+					applyConstraints(typeContext, resolvedClassMapping.clazz(), resolvedFieldMapping, effectiveConstraints);
 				}
 				catch (RuntimeException exception) {
 					log.warn(
@@ -82,11 +86,13 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	private void applyConstraints(
 		TypeConstraintMappingContext<?> typeContext,
+		Class<?> beanClass,
 		ResolvedFieldMapping resolvedFieldMapping,
 		EffectiveFieldConstraints effectiveConstraints
 	) {
 		PropertyConstraintMappingContext propertyContext =
-			typeContext.field(resolvedFieldMapping.fieldName()).ignoreAnnotations(true);
+			resolvePropertyContext(typeContext, beanClass, resolvedFieldMapping)
+				.ignoreAnnotations(true);
 		applyValidationMetadata(propertyContext, resolvedFieldMapping.validationMetadata());
 
 		if (effectiveConstraints.notNull()) {
@@ -149,6 +155,36 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 					.param("regex", extensionRule.regex()),
 				extensionRule.message());
 		}
+	}
+
+	private PropertyConstraintMappingContext resolvePropertyContext(
+		TypeConstraintMappingContext<?> typeContext,
+		Class<?> beanClass,
+		ResolvedFieldMapping resolvedFieldMapping
+	) {
+		String fieldName = resolvedFieldMapping.fieldName();
+		if (!resolvedFieldMapping.inherited()) {
+			return typeContext.field(fieldName);
+		}
+		String getterName = inheritedGetterName(beanClass, fieldName);
+		if (getterName == null) {
+			throw new InvalidConstraintConfigurationException(
+				"Configured override targets inherited field with no accessible getter. class="
+					+ beanClass.getName() + ", field=" + fieldName);
+		}
+		return typeContext.getter(getterName);
+	}
+
+	private String inheritedGetterName(Class<?> beanClass, String fieldName) {
+		PropertyDescriptor propertyDescriptor = BeanUtils.getPropertyDescriptor(beanClass, fieldName);
+		if (propertyDescriptor == null) {
+			return null;
+		}
+		Method readMethod = propertyDescriptor.getReadMethod();
+		if (readMethod == null || readMethod.getParameterCount() != 0) {
+			return null;
+		}
+		return propertyDescriptor.getName();
 	}
 
 	private void applyValidationMetadata(
