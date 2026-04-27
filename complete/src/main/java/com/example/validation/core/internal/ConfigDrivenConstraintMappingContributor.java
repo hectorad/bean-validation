@@ -5,9 +5,7 @@ import com.example.validation.core.api.JsonPathRegexRule;
 import com.example.validation.core.api.PatternRule;
 
 import java.lang.annotation.Annotation;
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -53,71 +51,33 @@ public class ConfigDrivenConstraintMappingContributor implements ConstraintMappi
 
 	@Override
 	public void createConstraintMappings(ConstraintMappingBuilder builder) {
-		Map<Class<?>, Map<String, List<DeclaredFieldEntry>>> entriesByDeclaringClass = groupByDeclaringClass();
-
-		for (Map.Entry<Class<?>, Map<String, List<DeclaredFieldEntry>>> classEntry : entriesByDeclaringClass.entrySet()) {
-			Class<?> declaringClass = classEntry.getKey();
+		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
 			ConstraintMapping constraintMapping = builder.addConstraintMapping();
-			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(declaringClass);
+			TypeConstraintMappingContext<?> typeContext = constraintMapping.type(resolvedClassMapping.clazz());
 
-			for (Map.Entry<String, List<DeclaredFieldEntry>> fieldEntry : classEntry.getValue().entrySet()) {
-				String fieldName = fieldEntry.getKey();
-				List<DeclaredFieldEntry> entries = fieldEntry.getValue();
-				List<RegisteredConstraintOverride> contributions = combinedContributions(entries);
-				ResolvedFieldMapping representative = entries.get(0).resolvedFieldMapping();
-				String diagnosticClassName = renderConfiguredClassNames(entries);
+			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
+				List<RegisteredConstraintOverride> contributions = validationOverrideRegistry.contributionsFor(
+					resolvedClassMapping.className(),
+					resolvedFieldMapping.fieldName());
 				try {
 					EffectiveFieldConstraints effectiveConstraints = constraintMergeService.merge(
-						representative.baselineConstraints(),
+						resolvedFieldMapping.baselineConstraints(),
 						contributions,
-						diagnosticClassName,
-						fieldName);
+						resolvedClassMapping.className(),
+						resolvedFieldMapping.fieldName());
 
-					applyConstraints(typeContext, representative, effectiveConstraints);
+					applyConstraints(typeContext, resolvedFieldMapping, effectiveConstraints);
 				}
 				catch (RuntimeException exception) {
 					log.warn(
 						"Skipping validation override constraint mapping for class={}, field={}, sources={} due to error: {}",
-						diagnosticClassName,
-						fieldName,
+						resolvedClassMapping.className(),
+						resolvedFieldMapping.fieldName(),
 						RegisteredConstraintOverride.renderSources(contributions),
 						exception.getMessage());
 				}
 			}
 		}
-	}
-
-	private Map<Class<?>, Map<String, List<DeclaredFieldEntry>>> groupByDeclaringClass() {
-		Map<Class<?>, Map<String, List<DeclaredFieldEntry>>> grouped = new LinkedHashMap<>();
-		for (ResolvedClassMapping resolvedClassMapping : resolvedClassMappings) {
-			for (ResolvedFieldMapping resolvedFieldMapping : resolvedClassMapping.fields()) {
-				grouped
-					.computeIfAbsent(resolvedFieldMapping.declaringClass(), key -> new LinkedHashMap<>())
-					.computeIfAbsent(resolvedFieldMapping.fieldName(), key -> new ArrayList<>())
-					.add(new DeclaredFieldEntry(resolvedClassMapping.className(), resolvedFieldMapping));
-			}
-		}
-		return grouped;
-	}
-
-	private List<RegisteredConstraintOverride> combinedContributions(List<DeclaredFieldEntry> entries) {
-		List<RegisteredConstraintOverride> combined = new ArrayList<>();
-		for (DeclaredFieldEntry entry : entries) {
-			combined.addAll(validationOverrideRegistry.contributionsFor(
-				entry.configuredClassName(),
-				entry.resolvedFieldMapping().fieldName()));
-		}
-		return combined;
-	}
-
-	private String renderConfiguredClassNames(List<DeclaredFieldEntry> entries) {
-		if (entries.size() == 1) {
-			return entries.getFirst().configuredClassName();
-		}
-		return entries.stream().map(DeclaredFieldEntry::configuredClassName).distinct().toList().toString();
-	}
-
-	private record DeclaredFieldEntry(String configuredClassName, ResolvedFieldMapping resolvedFieldMapping) {
 	}
 
 	private void applyConstraints(
