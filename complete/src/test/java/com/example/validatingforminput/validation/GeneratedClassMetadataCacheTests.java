@@ -217,13 +217,22 @@ public class GeneratedClassMetadataCacheTests {
 	void shouldResolveInheritedFieldAnnotations() {
 		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(InheritedFieldTarget.class, "nickname");
 
+		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(InheritedFieldBase.class);
 		assertThat(resolvedFieldMapping.baselineConstraints().notBlank()).isTrue();
+	}
+
+	@Test
+	void shouldRecordDeclaringClassForDirectField() {
+		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(CustomContributorTarget.class, "name");
+
+		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(CustomContributorTarget.class);
 	}
 
 	@Test
 	void shouldResolveGetterAnnotationsThroughBeanPropertyReadMethod() {
 		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(StandardGetterAnnotatedTarget.class, "code");
 
+		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(StandardGetterAnnotatedTarget.class);
 		assertThat(resolvedFieldMapping.baselineConstraints().notBlank()).isTrue();
 	}
 

@@ -2,7 +2,10 @@ package com.example.validation.core.internal;
 
 import com.example.validation.core.api.NumericBound;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,19 +39,24 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 
 		StringBuilder report = new StringBuilder();
 		report.append("\n=== Validation Troubleshooting Report ===\n");
+		Map<DeclaredFieldKey, List<DeclaredFieldEntry>> runtimeEntriesByField = groupRuntimeEntriesByField();
 
 		for (ResolvedClassMapping classMapping : metadataCache.getResolvedMappings()) {
 			report.append("Class: ").append(classMapping.className()).append('\n');
 
 			for (ResolvedFieldMapping fieldMapping : classMapping.fields()) {
-				List<RegisteredConstraintOverride> configuredConstraints = validationOverrideRegistry.contributionsFor(
-					classMapping.className(),
-					fieldMapping.fieldName());
+				List<DeclaredFieldEntry> runtimeEntries = runtimeEntriesFor(
+					runtimeEntriesByField,
+					classMapping,
+					fieldMapping);
+				List<RegisteredConstraintOverride> configuredConstraints = combinedContributions(runtimeEntries);
+				ResolvedFieldMapping representative = runtimeEntries.getFirst().resolvedFieldMapping();
+				String diagnosticClassName = renderConfiguredClassNames(runtimeEntries);
 				try {
 					EffectiveFieldConstraints effective = constraintMergeService.merge(
-						fieldMapping.baselineConstraints(),
+						representative.baselineConstraints(),
 						configuredConstraints,
-						classMapping.className(),
+						diagnosticClassName,
 						fieldMapping.fieldName());
 
 					appendFieldReport(report, fieldMapping, configuredConstraints, effective);
@@ -56,7 +64,7 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 				catch (RuntimeException exception) {
 					log.warn(
 						"Skipping validation troubleshooting entry for class={}, field={}, sources={} due to error: {}",
-						classMapping.className(),
+						diagnosticClassName,
 						fieldMapping.fieldName(),
 						RegisteredConstraintOverride.renderSources(configuredConstraints),
 						exception.getMessage());
@@ -67,6 +75,55 @@ public class ValidationTroubleshootingAnalyzer implements SmartInitializingSingl
 
 		report.append("=== End Validation Troubleshooting Report ===");
 		log.info(report.toString());
+	}
+
+	private Map<DeclaredFieldKey, List<DeclaredFieldEntry>> groupRuntimeEntriesByField() {
+		Map<DeclaredFieldKey, List<DeclaredFieldEntry>> grouped = new LinkedHashMap<>();
+		for (ResolvedClassMapping classMapping : metadataCache.getResolvedMappings()) {
+			for (ResolvedFieldMapping fieldMapping : classMapping.fields()) {
+				DeclaredFieldKey key = new DeclaredFieldKey(fieldMapping.declaringClass(), fieldMapping.fieldName());
+				grouped
+					.computeIfAbsent(key, ignored -> new ArrayList<>())
+					.add(new DeclaredFieldEntry(classMapping.className(), fieldMapping));
+			}
+		}
+		return grouped;
+	}
+
+	private List<DeclaredFieldEntry> runtimeEntriesFor(
+		Map<DeclaredFieldKey, List<DeclaredFieldEntry>> runtimeEntriesByField,
+		ResolvedClassMapping classMapping,
+		ResolvedFieldMapping fieldMapping
+	) {
+		List<DeclaredFieldEntry> entries =
+			runtimeEntriesByField.get(new DeclaredFieldKey(fieldMapping.declaringClass(), fieldMapping.fieldName()));
+		if (entries != null) {
+			return entries;
+		}
+		return List.of(new DeclaredFieldEntry(classMapping.className(), fieldMapping));
+	}
+
+	private List<RegisteredConstraintOverride> combinedContributions(List<DeclaredFieldEntry> entries) {
+		List<RegisteredConstraintOverride> combined = new ArrayList<>();
+		for (DeclaredFieldEntry entry : entries) {
+			combined.addAll(validationOverrideRegistry.contributionsFor(
+				entry.configuredClassName(),
+				entry.resolvedFieldMapping().fieldName()));
+		}
+		return combined;
+	}
+
+	private String renderConfiguredClassNames(List<DeclaredFieldEntry> entries) {
+		if (entries.size() == 1) {
+			return entries.getFirst().configuredClassName();
+		}
+		return entries.stream().map(DeclaredFieldEntry::configuredClassName).distinct().toList().toString();
+	}
+
+	private record DeclaredFieldKey(Class<?> declaringClass, String fieldName) {
+	}
+
+	private record DeclaredFieldEntry(String configuredClassName, ResolvedFieldMapping resolvedFieldMapping) {
 	}
 
 	private void appendFieldReport(
