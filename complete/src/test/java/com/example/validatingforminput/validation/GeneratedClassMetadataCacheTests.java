@@ -217,6 +217,7 @@ public class GeneratedClassMetadataCacheTests {
 	void shouldResolveInheritedFieldAnnotations() {
 		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(InheritedFieldTarget.class, "nickname");
 
+		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(InheritedFieldBase.class);
 		assertThat(resolvedFieldMapping.baselineConstraints().notBlank()).isTrue();
 	}
 
@@ -224,6 +225,7 @@ public class GeneratedClassMetadataCacheTests {
 	void shouldResolveGetterAnnotationsThroughBeanPropertyReadMethod() {
 		ResolvedFieldMapping resolvedFieldMapping = resolveSingleField(StandardGetterAnnotatedTarget.class, "code");
 
+		assertThat(resolvedFieldMapping.declaringClass()).isEqualTo(StandardGetterAnnotatedTarget.class);
 		assertThat(resolvedFieldMapping.baselineConstraints().notBlank()).isTrue();
 	}
 
